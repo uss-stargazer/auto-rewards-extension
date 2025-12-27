@@ -1,4 +1,4 @@
-import { MessageRequest, MessageResponse } from "../../contentScript";
+import { MessageRequest, MessageResponse } from "../contentScript";
 import { sendMessageAync, WithFixedProperties } from "../../modules/utils";
 import {
   AarpActivity,
@@ -84,12 +84,12 @@ export async function* getActivities(): AsyncGenerator<
     pageNumber++;
     await sendMessageAync(rewardsTab.id!, {
       action: "input",
-      query: changePageQuerySelectors.input,
+      elementQuery: changePageQuerySelectors.input,
       text: pageNumber.toString(),
     } satisfies MessageRequest);
     await sendMessageAync(rewardsTab.id!, {
       action: "click",
-      query: changePageQuerySelectors.button,
+      elementQuery: changePageQuerySelectors.button,
     } satisfies MessageRequest);
   }
 }
