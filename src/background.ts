@@ -1,6 +1,7 @@
 function polling() {
-  // console.log("polling");
-  setTimeout(polling, 1000 * 30);
+  setInterval(() => {
+    console.log("hello from background!");
+  }, 5000);
 }
 
 polling();
