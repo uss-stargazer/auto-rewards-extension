@@ -17,6 +17,7 @@ export interface AarpUser {
   username: string;
   fedId: string;
   accessToken: string;
+  rewardsBalance?: number;
 }
 
 // TODO: look here for styling and cool options (like searching for topics, for example)
@@ -61,6 +62,11 @@ export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
 >("getTabLocalStorage");
 
 // Service worker message definitions -------------------
+
+export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
+  chrome.tabs.UpdateProperties,
+  number
+>("updateAarpTab");
 
 export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
   "getAarpUser"

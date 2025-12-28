@@ -29,6 +29,7 @@ export async function queryAarpApi<Z extends z.ZodType>(
     headers["Content-Length"] = body.length.toString();
   }
 
+  console.log("about to make api call to", url);
   const response = await fetch(url, {
     method: "POST",
     headers: headers,
