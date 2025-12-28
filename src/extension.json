@@ -1,7 +1,7 @@
 {
   "options": "options.tsx",
   "sidepanel": "sidepanel.tsx",
-  "background": ["background.ts", "AARP/background.ts"],
+  "background": ["background.ts"],
   "contentScripts": [
     {
       "urlMatches": ["<all_urls>"],

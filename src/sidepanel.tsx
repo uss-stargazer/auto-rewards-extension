@@ -9,8 +9,8 @@ function Sidepanel() {
     <div>
       <h1>This is the sidepanel udpated (DO STYLING)</h1>
       <div id="platforms">
-        {platforms.map((platform) => (
-          <div>
+        {platforms.map((platform, idx) => (
+          <div key={idx}>
             <p>{platform.name}</p>
             <div>{platform.element}</div>
           </div>
