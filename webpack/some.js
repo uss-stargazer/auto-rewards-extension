@@ -1,7 +1,5 @@
-const webpack = require("webpack");
 const path = require("path");
 const fs = require("fs");
-const CopyPlugin = require("copy-webpack-plugin");
 
 const SRC_DIR = path.join(__dirname, "..", "src");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -55,36 +53,4 @@ function getEntryObject() {
   };
 }
 
-module.exports = {
-  entry: getEntryObject(),
-  output: {
-    path: OUTPUT_DIR,
-    filename: "[name].js",
-  },
-  optimization: {
-    splitChunks: {
-      name: "vendor",
-      chunks(chunk) {
-        return chunk.name !== "background";
-      },
-    },
-  },
-  module: {
-    rules: [
-      {
-        test: /\.tsx?$/,
-        use: "ts-loader",
-        exclude: /node_modules/,
-      },
-    ],
-  },
-  resolve: {
-    extensions: [".ts", ".tsx", ".js"],
-  },
-  plugins: [
-    new CopyPlugin({
-      patterns: [{ from: ".", to: "../", context: "public" }],
-      options: {},
-    }),
-  ],
-};
+console.log(getEntryObject());
