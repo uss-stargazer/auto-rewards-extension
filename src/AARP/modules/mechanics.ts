@@ -7,11 +7,20 @@ import {
   RewardsResponseSchema,
 } from "./definitions";
 
-const ORIGIN = "https://www.aarp.org";
-const LOGIN_URL = "https://secure.aarp.org/applications/user/login";
-const REWARDS_URL = `${ORIGIN}/rewards/earn`;
+export const ORIGIN = "https://www.aarp.org";
+export const LOGIN_URL = "https://secure.aarp.org/applications/user/login";
+export const REWARDS_URL = `${ORIGIN}/rewards/earn`;
 
-export async function getUser(): Promise<AarpUser | null> {
+export function isAarpTab(tabUrl: string | undefined): boolean {
+  return (tabUrl && /aarp.org$/.test(new URL(tabUrl).hostname)) || false;
+}
+
+export async function getUser(
+  aarpTab: chrome.tabs.Tab
+): Promise<AarpUser | null> {
+  if (!isAarpTab(aarpTab.url))
+    throw new Error("Tab must be in the AARP domain to get user");
+
   const username = await chrome.cookies.get({
     name: "game",
     url: "https://secure.aarp.org",
@@ -20,9 +29,10 @@ export async function getUser(): Promise<AarpUser | null> {
     name: "fedid",
     url: "https://secure.aarp.org",
   });
-  const accessToken = (await chrome.storage.local.get(["access_token"]))[
-    "access_token"
-  ];
+  const accessToken = await sendMessageAync(aarpTab.id!, {
+    action: "getLocalStorage",
+    key: "access_token",
+  } satisfies MessageRequest);
   return (
     username &&
     userFedId &&
@@ -34,21 +44,14 @@ export async function getUser(): Promise<AarpUser | null> {
   );
 }
 
-export async function* getActivities(): AsyncGenerator<
-  AarpActivity,
-  void,
-  undefined
-> {
-  if (!(await getUser()))
-    throw new NotLoggedInError(
-      "You must be signed into AARP to get rewards activities",
-      LOGIN_URL
-    );
-
-  const rewardsTab = await chrome.tabs.create({ url: REWARDS_URL });
+export async function* getActvities(
+  aarpRewardsTab: chrome.tabs.Tab
+): AsyncGenerator<AarpActivity, void, undefined> {
+  if (!isAarpTab(aarpRewardsTab.url))
+    throw new Error("Tab must be in the AARP domain to parse activities");
 
   const getPageNumber = (): number => {
-    const match = rewardsTab.url!.match(/#page=(\d+)/);
+    const match = aarpRewardsTab.url!.match(/#page=(\d+)/);
     return (match && Number(match[1])) ?? 1;
   };
   const changePageQuerySelectors = {
@@ -60,9 +63,10 @@ export async function* getActivities(): AsyncGenerator<
 
   let pageNumber = 1;
   while (pageNumber === getPageNumber()) {
-    const content: MessageResponse = await sendMessageAync(rewardsTab.id!, {
-      action: "getContent",
-    } satisfies MessageRequest);
+    const content: Extract<MessageResponse, { action: "getContent" }> =
+      await sendMessageAync(aarpRewardsTab.id!, {
+        action: "getContent",
+      } satisfies MessageRequest);
 
     const parser = new DOMParser();
     const html = parser.parseFromString(content.source, "text/html");
@@ -82,12 +86,12 @@ export async function* getActivities(): AsyncGenerator<
     });
 
     pageNumber++;
-    await sendMessageAync(rewardsTab.id!, {
+    await sendMessageAync(aarpRewardsTab.id!, {
       action: "input",
       elementQuery: changePageQuerySelectors.input,
       text: pageNumber.toString(),
     } satisfies MessageRequest);
-    await sendMessageAync(rewardsTab.id!, {
+    await sendMessageAync(aarpRewardsTab.id!, {
       action: "click",
       elementQuery: changePageQuerySelectors.button,
     } satisfies MessageRequest);
@@ -103,13 +107,17 @@ export async function* getActivities(): AsyncGenerator<
  * @throws NotLoggedInError if not logged into AARP, Error if POST rejected, Zod error if unexpected JSON response
  */
 export async function earnVideoRewards(
+  aarpTab: chrome.tabs.Tab,
   activity: WithFixedProperties<AarpActivity, { type: "video" }>
 ): Promise<{
   success: boolean;
   pointsEarned: number;
   dailyPointsLeft: number;
 }> {
-  const user = await getUser();
+  if (!isAarpTab(aarpTab.url))
+    throw new Error("Tab must be in the AARP domain to earn video rewards");
+
+  const user = await getUser(aarpTab);
   if (!user)
     throw new NotLoggedInError(
       "You must be signed into AARP to earn video rewards",

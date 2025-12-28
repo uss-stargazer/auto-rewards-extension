@@ -1,5 +1,6 @@
 export type MessageRequest =
   | { action: "getContent" }
+  | { action: "getLocalStorage"; key: string }
   | { action: "click"; elementQuery: string }
   | {
       action: "input";
@@ -7,10 +8,12 @@ export type MessageRequest =
       text: string;
     };
 
-export type MessageResponse = {
-  action: "getContent";
-  source: string;
-};
+export type MessageResponse =
+  | {
+      action: "getContent";
+      source: string;
+    }
+  | { action: "getLocalStorage"; value: string | null };
 
 function contentScript() {
   chrome.runtime.onMessage.addListener(
@@ -20,6 +23,11 @@ function contentScript() {
         sendResponse({
           action: "getContent",
           source: source,
+        } satisfies MessageResponse);
+      } else if (request.action === "getLocalStorage") {
+        sendResponse({
+          action: "getLocalStorage",
+          value: window.localStorage.getItem(request.key),
         } satisfies MessageResponse);
       } else if (request.action === "click") {
         const element = document.querySelector<HTMLElement>(
