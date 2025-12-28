@@ -7,7 +7,7 @@ const platforms = [aarp];
 function Sidepanel() {
   return (
     <div>
-      <h1>This is the sidepanel</h1>
+      <h1>This is the sidepanel udpated (DO STYLING)</h1>
       <div id="platforms">
         {platforms.map((platform) => (
           <div>
