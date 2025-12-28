@@ -34,7 +34,6 @@ function getEntryObject() {
   );
 
   return {
-    popup: path.join(SRC_DIR, extensionData.popup),
     options: path.join(SRC_DIR, extensionData.options),
     sidepanel: path.join(SRC_DIR, extensionData.sidepanel),
     background:
