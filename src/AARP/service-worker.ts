@@ -18,7 +18,7 @@ import {
   ORIGIN,
   queryAarpApi,
   REWARDS_URL,
-} from "./modules/mechanics";
+} from "./modules/tools";
 
 const SUPPORTED_ACTIVITY_TYPES = ["video"];
 const ACTIVITY_REWARDS_URL_PREFIX =
@@ -113,24 +113,10 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
 });
 
 /**
- * This is the main function for getting the video rewards. Some AARP server somewhere
+ * This is the main function for getting the activity rewards. Some AARP server somewhere
  * gives rewards to an account when a single POST request is sent to it with the proper
- * authentication, so we're just gonna send it so we don't have to watch the video.
+ * authentication, so we're just gonna send it so we don't have to do the activity.
  */
-export async function earnVideoRewards(
-  activity: AarpActivity,
-  user: AarpUser
-): Promise<AarpRewardsResponse> {
-  const activityRewardsUrl = `${ACTIVITY_REWARDS_URL_PREFIX}/${user.fedId}/${activity.identifier}`;
-  return await queryAarpApi(
-    activityRewardsUrl,
-    {},
-    user.accessToken,
-    activity.url,
-    RewardsResponseSchema
-  );
-}
-
 onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
   const user = await getUser();
   if (!user)
@@ -139,6 +125,8 @@ onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
       LOGIN_URL
     );
 
+  if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
+    return sendResponse(null);
   if (openActivityUrl) {
     const aarpTab = await updateTabAndWaitForLoad((await getAarpTab()).id!, {
       url: activity.url,
@@ -147,10 +135,14 @@ onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
     if (!aarpTab) throw new Error("Error occurred updating AARP tab URL");
   }
 
-  switch (activity.activityType.identifier) {
-    case "video":
-      return sendResponse(await earnVideoRewards(activity, user));
-    default:
-      return sendResponse(null);
-  }
+  const activityRewardsUrl = `${ACTIVITY_REWARDS_URL_PREFIX}/${user.fedId}/${activity.identifier}`;
+  return sendResponse(
+    await queryAarpApi(
+      activityRewardsUrl,
+      {},
+      user.accessToken,
+      activity.url,
+      RewardsResponseSchema
+    )
+  );
 });
