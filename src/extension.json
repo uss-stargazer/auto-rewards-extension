@@ -1,0 +1,18 @@
+{
+  "popup": "popup.tsx",
+  "options": "options.tsx",
+  "sidepanel": "sidepanel.tsx",
+  "background": ["background.ts", "AARP/background.ts"],
+  "contentScripts": [
+    {
+      "urlMatches": ["<all_urls>"],
+      "scripts": [{ "name": "contentScript", "path": "contentScript.ts" }]
+    },
+    {
+      "urlMatches": ["https://*.aarp.org/**"],
+      "scripts": [
+        { "name": "aarpContentScript", "path": "AARP/contentScript.ts" }
+      ]
+    }
+  ]
+}
