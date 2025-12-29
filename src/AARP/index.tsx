@@ -11,7 +11,7 @@ import {
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
 
-const MAX_DAILY_REWARDS = 5000
+const MAX_DAILY_REWARDS = 5000;
 const ACTIVITIES_CHUNK_SIZE = 5;
 const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
 
@@ -53,8 +53,6 @@ function Activity({ activity }: { activity: AarpActivity }) {
   );
 }
 
-
-
 export function AARP() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
@@ -65,13 +63,18 @@ export function AARP() {
 
   const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
+    console.log("updating user");
     updateUser().finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
     if (user) {
+      console.log("getting activities");
       getActivities(MAX_ACTIVITIES)
-        .then((aarpActivities) => setActivities(aarpActivities))
+        .then((aarpActivities) => {
+          console.log("setting activities");
+          setActivities(aarpActivities);
+        })
         .catch(() => setActivities([]));
     }
   }, [user]);
@@ -88,15 +91,13 @@ export function AARP() {
 
   if (!user) return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
 
-  const earnMaxDailyRewards=()=>{
-    if (user &&activities) {
-      let dailyRewardsLeft = MAX_DAILY_REWARDS
-      let activityN = 0
-      while (activities[activityN] && dailyRewardsLeft > 0) {
-        
-      }
+  const earnMaxDailyRewards = () => {
+    if (user && activities) {
+      let dailyRewardsLeft = MAX_DAILY_REWARDS;
+      let activityN = 0;
+      while (activities[activityN] && dailyRewardsLeft > 0) {}
     }
-  }
+  };
 
   return (
     <div>
@@ -106,13 +107,16 @@ export function AARP() {
       </div>
       <div>
         {activities.length > 0 ? (
-          <a>Get max rewards</a>
-          <div>
-            {activities.slice(0, nActivitiesDisplayed).map((activity, idx) => (
-              <Activity key={idx} activity={activity} />
-            ))}
-          </div>
-
+          <>
+            <a onClick={earnMaxDailyRewards}>Get max rewards</a>
+            <div>
+              {activities
+                .slice(0, nActivitiesDisplayed)
+                .map((activity, idx) => (
+                  <Activity key={idx} activity={activity} />
+                ))}
+            </div>
+          </>
         ) : (
           <p>No activities found.</p>
         )}

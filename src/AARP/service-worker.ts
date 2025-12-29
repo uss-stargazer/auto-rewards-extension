@@ -31,9 +31,13 @@ const ACTIVITY_REWARDS_API_URL = (
   `https://services.share.aarp.org/applications/loyalty-catalog/activity/usergroup/member/user/${userFedId}/${activityId}`;
 
 async function getAarpTab(): Promise<chrome.tabs.Tab> {
+  console.log("getting aarp tab");
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  console.log("\tall current tabs:", tabs);
   const aarpTabs = tabs.filter((tab) => isAarpTab(tab.url));
+  console.log("\tall current aarp tabs:", aarpTabs);
   if (aarpTabs.length > 0) return aarpTabs[0];
+  console.log("\tcouldn't find active aarp tab so imma create a new one");
   return new Promise((resolve) => {
     chrome.tabs.create({ url: ORIGIN, active: true }, (newTab) => {
       const listener = (
@@ -52,6 +56,7 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
 }
 
 onUpdateAarpTabRequest(async (sendResponse, update) => {
+  console.log("updating aarp tab", update);
   const aarpTab = await updateTabAndWaitForLoad(
     (
       await getAarpTab()
@@ -63,8 +68,7 @@ onUpdateAarpTabRequest(async (sendResponse, update) => {
 });
 
 onGetUserRequest(async (sendResponse) => {
-  console.log("recieved request to get user");
-
+  console.log("getting user object");
   const aarpTab = await getAarpTab();
   const cookies = await ["games", "fedid", "aarp_rewards_balance"].reduce<
     Promise<{
@@ -76,11 +80,11 @@ onGetUserRequest(async (sendResponse) => {
     cookiesObj[cookieName] = cookie && cookie.value;
     return cookiesObj;
   }, Promise.resolve({}));
+  console.log("\tgot cookies:", cookies);
   const accessToken = await getTabLocalStorage("access_token", aarpTab.id!);
+  console.log("\tgot access token:", accessToken);
 
-  console.log("\tGot all the info I could:", cookies, "|", accessToken);
-
-  return sendResponse(
+  const user =
     (cookies["games"] &&
       cookies["fedid"] &&
       accessToken && {
@@ -92,26 +96,30 @@ onGetUserRequest(async (sendResponse) => {
             Number(cookies["aarp_rewards_balance"])) ||
           undefined,
       }) ||
-      null
-  );
+    null;
+
+  console.log("\tgot user:", user);
+  return sendResponse(user);
 });
 
 onActivitiesRequest(async (sendResponse, maxNActivities) => {
-  console.log("getting activities sergvie worker");
+  console.log("getting activities list");
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(
       "You must be logged into AARP to get activities",
       LOGIN_URL
     );
+  console.log("\tgot user for activities request");
 
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
   const aarpTab = await chrome.tabs.get(
     await updateAarpTab({ url: REWARDS_URL, active: true })
   );
+  console.log("\tgot aarp tab with rewards url:", REWARDS_URL);
 
-  console.log("about to query api for activity list");
+  console.log("\tabout to query api for activity list");
   const activitiesList = await queryAarpApi(
     ACTIVITY_LIST_API_URL,
     undefined,
@@ -119,6 +127,8 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
     aarpTab.url!,
     ActivitiesListSchema
   );
+
+  console.log("\traw activities list:", activitiesList);
 
   // We need to filter out outdated/inactive activities as well as activites we can't automate
   const now = new Date();
@@ -136,6 +146,7 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
     }
     return false;
   });
+  console.log("\tfiltered activities list:", filteredActivitiesList);
 
   return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
 });
