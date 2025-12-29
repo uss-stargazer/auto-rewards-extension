@@ -2,23 +2,66 @@ import React, { useEffect, useState } from "react";
 import {
   AarpActivity,
   AarpUser,
+  earnActivityRewards,
   getActivities,
+  getActivityStatus,
   getUser,
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
 
-const MAX_ACTIVITIES = 25;
+const MAX_DAILY_REWARDS = 5000
+const ACTIVITIES_CHUNK_SIZE = 5;
+const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
 
 function Activity({ activity }: { activity: AarpActivity }) {
-  return <div></div>;
+  const [isComplete, setIsComplete] = useState<boolean>();
+
+  useEffect(() => {
+    if (!isComplete) {
+      getActivityStatus(activity.identifier).then((status) =>
+        setIsComplete(status.completed)
+      );
+    }
+  }, [isComplete]);
+
+  return (
+    <div>
+      <div>
+        <h4>{activity.name}</h4>
+        {isComplete ? (
+          <p>Completed</p>
+        ) : (
+          <p>{activity.activityType.basePointValue}</p>
+        )}
+      </div>
+      <p>{activity.description}</p>
+      {isComplete || (
+        <a
+          onClick={() =>
+            earnActivityRewards({
+              activity: activity,
+              openActivityUrl: true,
+            }).then(() => setIsComplete(true))
+          }
+        >
+          Get rewards
+        </a>
+      )}
+    </div>
+  );
 }
+
+
 
 export function AARP() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivity[]>([]);
+  const [nActivitiesDisplayed, setNActivitiesDisplayed] = useState<number>(
+    ACTIVITIES_CHUNK_SIZE
+  );
 
   const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
@@ -45,14 +88,31 @@ export function AARP() {
 
   if (!user) return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
 
+  const earnMaxDailyRewards=()=>{
+    if (user &&activities) {
+      let dailyRewardsLeft = MAX_DAILY_REWARDS
+      let activityN = 0
+      while (activities[activityN] && dailyRewardsLeft > 0) {
+        
+      }
+    }
+  }
+
   return (
     <div>
-      <h2>Hello {user.username}!</h2>
+      <div>
+        <h2>Hello {user.username}!</h2>
+        <h3>Rewards balance: {user.rewardsBalance ?? "unknown"}</h3>
+      </div>
       <div>
         {activities.length > 0 ? (
-          activities.map((activity, idx) => (
-            <Activity key={idx} activity={activity} />
-          ))
+          <a>Get max rewards</a>
+          <div>
+            {activities.slice(0, nActivitiesDisplayed).map((activity, idx) => (
+              <Activity key={idx} activity={activity} />
+            ))}
+          </div>
+
         ) : (
           <p>No activities found.</p>
         )}

@@ -1,10 +1,12 @@
 import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
   ActivitiesListSchema,
+  ActivityStatusResponseSchema,
   getTabLocalStorage,
   getUser,
   NotLoggedInError,
   onActivitiesRequest,
+  onActivityStatusRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
   onUpdateAarpTabRequest,
@@ -136,6 +138,25 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
   });
 
   return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
+});
+
+onActivityStatusRequest(async (sendResponse) => {
+  const user = await getUser();
+  if (!user)
+    throw new NotLoggedInError(
+      "You must be logged into AARP to get activity statusi",
+      LOGIN_URL
+    );
+
+  return sendResponse(
+    await queryAarpApi(
+      "___________________________________",
+      undefined,
+      user.accessToken,
+      REWARDS_URL,
+      ActivityStatusResponseSchema
+    )
+  );
 });
 
 /**
