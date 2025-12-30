@@ -61,10 +61,18 @@ export function AARP() {
     ACTIVITIES_CHUNK_SIZE
   );
 
-  const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
     console.log("updating user");
-    updateUser().finally(() => setIsLoading(false));
+    const updateUserListener = (_, _, tab) => { 
+      if (isAarpTab(tab.url)) {
+        setIsLoading(true);
+        getUser()
+          .then((user) => setUser(user))
+          .finally(() => setIsLoading(false));
+      }
+    }
+    chrome.tabs.onUpdated.addListener(updateUserListener);
+    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
   }, []);
 
   useEffect(() => {
@@ -76,26 +84,30 @@ export function AARP() {
           setActivities(aarpActivities);
         })
         .catch(() => setActivities([]));
+    } else {
+      setActivities([]);
     }
   }, [user]);
 
   const NotLoggedInPrompt = () => (
     <div>
       <h2>You are not logged into AARP.</h2>
-      <div>
-        <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
-        <a onClick={updateUser}>Refresh</a>
-      </div>
+      <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
     </div>
   );
 
-  if (!user) return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
+  if (!user || user.mustConfirmPassword)
+    return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
 
-  const earnMaxDailyRewards = () => {
+  const earnMaxDailyRewards = async () => {
     if (user && activities) {
-      let dailyRewardsLeft = MAX_DAILY_REWARDS;
-      let activityN = 0;
-      while (activities[activityN] && dailyRewardsLeft > 0) {}
+      let dailyRewardsLeft = user.dailyRewardsLeft;
+      let activityIdx = 0;
+      while (activities[activityIdx] && dailyRewardsLeft > 0) {
+        const rewards = await earnActivityRewards(activities[activityIdx]);
+        dailyRewardsLeft -= rewards.rewardsEarned;
+        activityIdx++;
+      }
     }
   };
 
