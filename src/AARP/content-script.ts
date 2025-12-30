@@ -5,3 +5,6 @@ onTabLocalStorageRequest(async (sendResponse, key) => {
   console.log("got entry value:", localStorage.getItem(key));
   return sendResponse(localStorage.getItem(key));
 });
+
+// Make it so that on every aarp page load, it sends an updated user variable to service worker so
+// or on tab update, get user and somehow send to index.tsx
