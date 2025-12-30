@@ -13,7 +13,8 @@ export async function queryAarpApi<Z extends z.ZodType>(
   payload: any | undefined,
   accessToken: string,
   referer: string,
-  schema: Z
+  schema: Z,
+  method: "POST" | "GET" = "POST"
 ): Promise<z.infer<Z>> {
   const body = payload !== undefined ? JSON.stringify(payload) : undefined;
   const headers: { [key: string]: string } = {
@@ -29,12 +30,15 @@ export async function queryAarpApi<Z extends z.ZodType>(
     headers["Content-Length"] = body.length.toString();
   }
 
-  console.log("about to make api call to", url);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: headers,
-    body: body ?? undefined,
-  });
+  const request = {
+    method,
+    headers,
+    body,
+  };
+  console.log("about to make api call to", url, "with", request);
+  const response = await fetch(url, request);
 
-  return schema.parse(await response.json());
+  const json = await response.json();
+  console.log("recieved response", json);
+  return schema.parse(json);
 }

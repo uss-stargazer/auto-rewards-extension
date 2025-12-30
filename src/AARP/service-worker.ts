@@ -1,9 +1,12 @@
 import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
+  AarpActivity,
+  AarpActivityStatusResponse,
+  AarpRewardsResponse,
+  AarpUser,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
-  getUser,
   NotLoggedInError,
   onActivitiesRequest,
   onActivityStatusRequest,
@@ -11,7 +14,6 @@ import {
   onGetUserRequest,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
-  updateAarpTab,
 } from "./modules/definitions";
 import {
   isAarpTab,
@@ -20,6 +22,8 @@ import {
   queryAarpApi,
   REWARDS_URL,
 } from "./modules/tools";
+
+console.log("hello from service worker");
 
 const SUPPORTED_ACTIVITY_TYPES = ["video"];
 const ACTIVITY_LIST_API_URL =
@@ -55,7 +59,9 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
-onUpdateAarpTabRequest(async (sendResponse, update) => {
+async function updateAarpTab(
+  update: chrome.tabs.UpdateProperties
+): Promise<number> {
   console.log("updating aarp tab", update);
   const aarpTab = await updateTabAndWaitForLoad(
     (
@@ -64,13 +70,19 @@ onUpdateAarpTabRequest(async (sendResponse, update) => {
     update
   );
   if (!aarpTab) throw new Error("Error occurred updating AARP tab");
-  return sendResponse(aarpTab.id!);
-});
+  return aarpTab.id!;
+}
 
-onGetUserRequest(async (sendResponse) => {
+async function getUser(): Promise<AarpUser | null> {
   console.log("getting user object");
   const aarpTab = await getAarpTab();
-  const cookies = await ["games", "fedid", "aarp_rewards_balance"].reduce<
+  const cookies = await [
+    "games",
+    "fedid",
+    "aarp_rewards_balance",
+    "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
+    "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
+  ].reduce<
     Promise<{
       [key: string]: string | null;
     }>
@@ -81,28 +93,33 @@ onGetUserRequest(async (sendResponse) => {
     return cookiesObj;
   }, Promise.resolve({}));
   console.log("\tgot cookies:", cookies);
-  const accessToken = await getTabLocalStorage("access_token", aarpTab.id!);
+
+  const accessToken =
+    (await getTabLocalStorage("access_token", aarpTab.id!)) ??
+    (await getTabLocalStorage("acctAccessToken", aarpTab.id!));
+
   console.log("\tgot access token:", accessToken);
 
   const user =
-    (cookies["games"] &&
-      cookies["fedid"] &&
+    (cookies["fedid"] &&
       accessToken && {
-        username: cookies["games"],
+        username: cookies["games"] ?? "unknown",
         fedId: cookies["fedid"],
         accessToken: accessToken,
         rewardsBalance:
           (cookies["aarp_rewards_balance"] &&
             Number(cookies["aarp_rewards_balance"])) ||
           undefined,
+        userMustConfirmPassword:
+          !cookies["AARP_SSO_AUTH_EX"] || !cookies["AARP_SSO_AUTH2"],
       }) ||
     null;
 
   console.log("\tgot user:", user);
-  return sendResponse(user);
-});
+  return user;
+}
 
-onActivitiesRequest(async (sendResponse, maxNActivities) => {
+async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
   console.log("getting activities list");
   await getAarpTab();
   console.log("\tgot aarp tab");
@@ -128,7 +145,8 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
     undefined,
     user.accessToken,
     aarpTab.url!,
-    ActivitiesListSchema
+    ActivitiesListSchema,
+    "GET"
   );
 
   console.log("\traw activities list:", activitiesList);
@@ -151,10 +169,12 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
   });
   console.log("\tfiltered activities list:", filteredActivitiesList);
 
-  return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
-});
+  return filteredActivitiesList.slice(0, maxNActivities);
+}
 
-onActivityStatusRequest(async (sendResponse) => {
+async function getActivityStatus(
+  activityId: string
+): Promise<AarpActivityStatusResponse> {
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(
@@ -162,23 +182,19 @@ onActivityStatusRequest(async (sendResponse) => {
       LOGIN_URL
     );
 
-  return sendResponse(
-    await queryAarpApi(
-      "___________________________________",
-      undefined,
-      user.accessToken,
-      REWARDS_URL,
-      ActivityStatusResponseSchema
-    )
+  return await queryAarpApi(
+    "___________________________________",
+    undefined,
+    user.accessToken,
+    REWARDS_URL,
+    ActivityStatusResponseSchema
   );
-});
+}
 
-/**
- * This is the main function for getting the activity rewards. Some AARP server somewhere
- * gives rewards to an account when a single POST request is sent to it with the proper
- * authentication, so we're just gonna send it so we don't have to do the activity.
- */
-onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
+async function earnActivityRewards(
+  activity: AarpActivity,
+  openActivityUrl: boolean
+): Promise<AarpRewardsResponse | null> {
   console.log("earn activity rewards for", activity.identifier);
   const user = await getUser();
   if (!user)
@@ -188,16 +204,34 @@ onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
     );
 
   if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
-    return sendResponse(null);
+    return null;
   if (openActivityUrl) await updateAarpTab({ url: activity.url, active: true });
 
-  return sendResponse(
-    await queryAarpApi(
-      ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
-      {},
-      user.accessToken,
-      activity.url,
-      RewardsResponseSchema
-    )
+  return await queryAarpApi(
+    ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
+    {},
+    user.accessToken,
+    activity.url,
+    RewardsResponseSchema
   );
-});
+}
+
+// Register message listeners -----------------------------------------------
+
+onUpdateAarpTabRequest(async (sendResponse, update) =>
+  sendResponse(await updateAarpTab(update))
+);
+
+onGetUserRequest(async (sendResponse) => sendResponse(await getUser()));
+
+onActivitiesRequest(async (sendResponse, maxNActivities) =>
+  sendResponse(await getActivities(maxNActivities))
+);
+
+onActivityStatusRequest(async (sendResponse, activityId) =>
+  sendResponse(await getActivityStatus(activityId))
+);
+
+onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) =>
+  sendResponse(await earnActivityRewards(activity, openActivityUrl))
+);

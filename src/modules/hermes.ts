@@ -50,6 +50,7 @@ const makeSend =
         sendParams.unshift(extensionId);
       }
 
+      console.log("calling browserEnv.runtime.sendMessage with", sendParams);
       browserEnv.runtime.sendMessage(...sendParams);
     });
   };
@@ -86,6 +87,7 @@ const makeTabSend =
         },
       ];
 
+      console.log("calling browserEnv.tabs.sendMessage with", sendParams);
       browserEnv.tabs.sendMessage(...sendParams);
     });
   };
@@ -132,9 +134,12 @@ export const createMessage = <Data, ReturnValue>(
   identifier: string
 ): [(data: Data) => Promise<ReturnValue>, Subscriber<Data, ReturnValue>] => {
   const subscribe = (callback: Callback<Data, ReturnValue>) => {
-    browserEnv.runtime.onMessage.addListener(
-      makeListener(identifier, callback)
+    const cb = makeListener(identifier, callback);
+    console.log(
+      "calling browserEnv.runtime.onMessage.addListener with",
+      cb.toString()
     );
+    browserEnv.runtime.onMessage.addListener(cb);
   };
 
   return [makeSend(identifier), subscribe];
@@ -147,9 +152,12 @@ export const createTabMessage = <Data, ReturnValue>(
   Subscriber<Data, ReturnValue>
 ] => {
   const subscribe = (callback: Callback<Data, ReturnValue>) => {
-    browserEnv.runtime.onMessage.addListener(
-      makeListener(identifier, callback)
+    const cb = makeListener(identifier, callback);
+    console.log(
+      "calling browserEnv.runtime.onMessage.addListener with",
+      cb.toString()
     );
+    browserEnv.runtime.onMessage.addListener(cb);
   };
 
   return [makeTabSend(identifier), subscribe];

@@ -11,13 +11,14 @@ export class NotLoggedInError extends Error {
   }
 }
 
-// Types and schemas -------------------
+// Types and schemas ------------------------------------------------------------------------------
 
 export interface AarpUser {
   username: string;
   fedId: string;
   accessToken: string;
   rewardsBalance?: number;
+  userMustConfirmPassword: boolean;
 }
 
 // TODO: look here for styling and cool options (like searching for topics, for example)
@@ -34,10 +35,10 @@ const ActivitySchema = z.object({
   }),
   name: z.string(),
   category: z.string(),
-  url: z.url(),
-  imageUrl: z.url(),
-  description: z.string(),
-  primaryTopic: "Tech",
+  url: z.union([z.url(), z.string().length(0)]),
+  imageUrl: z.union([z.url(), z.string().length(0), z.null()]),
+  description: z.nullable(z.string()),
+  primaryTopic: z.nullable(z.string()),
   active: z.boolean(),
   deleted: z.nullable(z.boolean()),
   membersOnly: z.boolean(),
@@ -46,6 +47,9 @@ export type AarpActivity = z.infer<typeof ActivitySchema>;
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
 export const ActivityStatusResponseSchema = z.object({});
+export type AarpActivityStatusResponse = z.infer<
+  typeof ActivityStatusResponseSchema
+>;
 
 export const RewardsResponseSchema = z.object({
   activityCompleted: z.uuid(),
@@ -56,14 +60,14 @@ export const RewardsResponseSchema = z.object({
 });
 export type AarpRewardsResponse = z.infer<typeof RewardsResponseSchema>;
 
-// Content script message definitions -------------------
+// Content script message definitions -------------------------------------------------------------
 
 export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
   string,
   string | null
 >("getTabLocalStorage");
 
-// Service worker message definitions -------------------
+// Service worker message definitions -------------------------------------------------------------
 
 export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
   chrome.tabs.UpdateProperties,
@@ -81,7 +85,7 @@ export const [getActivities, onActivitiesRequest] = createMessage<
 
 export const [getActivityStatus, onActivityStatusRequest] = createMessage<
   string,
-  z.infer<typeof ActivityStatusResponseSchema>
+  AarpActivityStatusResponse
 >("getAarpActivityStatus");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<

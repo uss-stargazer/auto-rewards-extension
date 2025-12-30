@@ -63,11 +63,8 @@ export function AARP() {
 
   const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
-    // console.log("updating user");
-    // updateUser().finally(() => setIsLoading(false));
-    getActivities(MAX_ACTIVITIES).then((aarpActivities) =>
-      setActivities(aarpActivities)
-    );
+    console.log("updating user");
+    updateUser().finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -127,6 +124,89 @@ export function AARP() {
     </div>
   );
 }
+
+// function AARP() {
+//   return (
+//     <>
+//       <button
+//         onClick={() =>
+//           updateAarpTab({
+//             url: "https://www.aarp.org/afslfja/afdsa/fds/",
+//             active: true,
+//           }).then((tabid) =>
+//             chrome.tabs
+//               .get(tabid)
+//               .then((tab) => console.log("index.tsx: got updated tab:", tab))
+//           )
+//         }
+//       >
+//         update aarp tab to https://www.aarp.org/afslfja/afdsa/fds/
+//       </button>
+
+//       <button
+//         onClick={() =>
+//           getUser().then((user) => console.log("index.tsx: got user:", user))
+//         }
+//       >
+//         G3t user
+//       </button>
+
+//       <button
+//         onClick={() =>
+//           getActivities(20).then((activities) =>
+//             console.log("index.tsx: get activities:", activities)
+//           )
+//         }
+//       >
+//         G3t activtiies (20)
+//       </button>
+
+//       <button
+//         onClick={() =>
+//           getActivityStatus("fjdkla;f").then((status) =>
+//             console.log("index.ts: get activity status:", status)
+//           )
+//         }
+//       >
+//         get activity status with bad id
+//       </button>
+
+//       <button
+//         onClick={() =>
+//           earnActivityRewards({
+//             activity: {
+//               identifier: "jfdkaljfkld;",
+//               startDate: "2019-07-11T01:00:00.000Z",
+//               endDate: "2031-01-01T04:59:00.000Z",
+//               activityType: {
+//                 identifier: "monthlyFitness",
+//                 basePointValue: 1000,
+//                 name: "Fitness Tracker",
+//                 visibleOnSite: true,
+//                 active: true,
+//               },
+
+//               name: "Bike 250 miles in a month",
+//               category: "health",
+//               url: "https://www.aarp.org/rewards/earn/fitness/bike/",
+//               imageUrl:
+//                 "https://cdn.aarp.net/content/dam/aarp/rewards/earn-activities/2019/sports-cooler.svg",
+//               description:
+//                 "Crush this goal by the end of the month. Let's do it!",
+//               primaryTopic: "Fitness",
+//               active: true,
+//               deleted: false,
+//               membersOnly: false,
+//             },
+//             openActivityUrl: true,
+//           }).then((rewards) => console.log("index.tsx: earn rewards:", rewards))
+//         }
+//       >
+//         Earn rewards with bad activity
+//       </button>
+//     </>
+//   );
+// }
 
 export default {
   name: "AARP",
