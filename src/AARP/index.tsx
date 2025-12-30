@@ -9,11 +9,18 @@ import {
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
-import { LOGIN_URL } from "./modules/tools";
+import { LOGIN_URL, isAarpTab } from "./modules/tools";
 
 const MAX_DAILY_REWARDS = 5000;
 const ACTIVITIES_CHUNK_SIZE = 5;
 const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
+
+  function NotLoggedInPrompt({user}: {user: Extract<AarpUser, {userMustConfirmPassword: true}> | null}) {return  (
+    <div>
+      <h2>{user ? `You are logged in as ${user.username}, but you need to confirm your password.` : "You are not logged into AARP."}</h2>
+      <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
+    </div>
+  );}
 
 function Activity({ activity }: { activity: AarpActivity }) {
   const [isComplete, setIsComplete] = useState<boolean>();
@@ -63,7 +70,7 @@ export function AARP() {
 
   useEffect(() => {
     console.log("updating user");
-    const updateUserListener = (_, _, tab) => { 
+    const updateUserListener = (_, _, tab: chrome.tabs.Tab) => { 
       if (isAarpTab(tab.url)) {
         setIsLoading(true);
         getUser()
@@ -89,15 +96,10 @@ export function AARP() {
     }
   }, [user]);
 
-  const NotLoggedInPrompt = () => (
-    <div>
-      <h2>You are not logged into AARP.</h2>
-      <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
-    </div>
-  );
 
-  if (!user || user.mustConfirmPassword)
-    return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
+
+  if (!user || user.userMustConfirmPassword)
+    return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt user={user} />;
 
   const earnMaxDailyRewards = async () => {
     if (user && activities) {

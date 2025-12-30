@@ -18,6 +18,7 @@ export interface AarpUser {
   fedId: string;
   accessToken: string;
   rewardsBalance?: number;
+  dailyRewardsAvailable?: number;
   userMustConfirmPassword: boolean;
 }
 
