@@ -104,6 +104,9 @@ onGetUserRequest(async (sendResponse) => {
 
 onActivitiesRequest(async (sendResponse, maxNActivities) => {
   console.log("getting activities list");
+  await getAarpTab();
+  console.log("\tgot aarp tab");
+
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(

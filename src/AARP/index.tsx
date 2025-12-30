@@ -63,8 +63,11 @@ export function AARP() {
 
   const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
-    console.log("updating user");
-    updateUser().finally(() => setIsLoading(false));
+    // console.log("updating user");
+    // updateUser().finally(() => setIsLoading(false));
+    getActivities(MAX_ACTIVITIES).then((aarpActivities) =>
+      setActivities(aarpActivities)
+    );
   }, []);
 
   useEffect(() => {
