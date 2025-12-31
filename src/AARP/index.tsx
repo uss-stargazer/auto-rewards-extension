@@ -13,6 +13,7 @@ import {
   earnActivityRewards,
   getActivities,
   getUser,
+  onPossibleUserUpdate,
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
@@ -23,7 +24,7 @@ type AARPData =
   | {
       status: "loggedIn" | "mustConfirmPassword";
       user: AarpUser;
-      activities: AarpActivityWithStatus[];
+      activities: AarpActivity[];
     }
   | { status: "notLoggedIn" };
 
@@ -33,7 +34,13 @@ const MAX_ACTIVITIES = 4000; // Should never really get beyond this, but just a 
 
 const AARPDataContext = createContext<AARPData | "loading">("loading");
 
-function Activity({ activityIdx }: { activityIdx: number }) {
+function Activity({
+  activityIdx,
+  isCompleted,
+}: {
+  activityIdx: number;
+  isCompleted: boolean;
+}) {
   const aarpData = useContext(AARPDataContext);
 
   if (aarpData === "loading" || aarpData.status !== "loggedIn")
@@ -48,14 +55,14 @@ function Activity({ activityIdx }: { activityIdx: number }) {
     <div>
       <div>
         <h4>{activity.name}</h4>
-        {activity.isCompleted ? (
+        {isCompleted ? (
           <p>Completed</p>
         ) : (
           <p>{activity.activityType.basePointValue}</p>
         )}
       </div>
       <p>{activity.description}</p>
-      {activity.isCompleted || (
+      {isCompleted || (
         <a
           onClick={() =>
             earnActivityRewards({
@@ -74,9 +81,6 @@ function Activity({ activityIdx }: { activityIdx: number }) {
 
 function AARP() {
   const aarpData = useContext(AARPDataContext);
-  const [nActivitiesDisplayed, setNActivitiesDisplayed] = useState<number>(
-    ACTIVITIES_CHUNK_SIZE
-  );
 
   if (aarpData === "loading") return <LoadingAnimation />;
   if (aarpData.status !== "loggedIn")
@@ -91,15 +95,27 @@ function AARP() {
       </div>
     );
 
+  const [activitiesAreLoading, setActivitiesAreLoading] =
+    useState<boolean>(true);
+  const [shownActivities, setShownActivities] = useState<
+    { activityIdx: number; isCompleted: boolean }[]
+  >([]);
+
+  // some useEffect here to populate shown activities and get status for all of em before populating
+
+  // some function to modify shown activities from search of something
+
   const earnMaxDailyRewards = async () => {
     if (aarpData.activities) {
       let dailyRewardsLeft =
         aarpData.user.dailyRewardsAvailable ?? MAX_DAILY_REWARDS;
       let activityIdx = 0;
       while (aarpData.activities[activityIdx] && dailyRewardsLeft > 0) {
+        const activity = aarpData.activities[activityIdx];
         const rewards = await earnActivityRewards({
-          activity: aarpData.activities[activityIdx],
+          activity: { ...activity, type: activity.activityType.identifier },
           openActivityUrl: false,
+          user: { ...aarpData.user },
         });
         if (rewards && rewards.success)
           dailyRewardsLeft = rewards.userDailyPointsLeft;
@@ -111,19 +127,23 @@ function AARP() {
   return (
     <div>
       <div>
-        <h2>Hello {user.username}!</h2>
-        <h3>Rewards balance: {user.rewardsBalance ?? "unknown"}</h3>
+        <h2>Hello {aarpData.user.username}!</h2>
+        <h3>Rewards balance: {aarpData.user.rewardsBalance ?? "unknown"}</h3>
       </div>
       <div>
-        {activities.length > 0 ? (
+        {activitiesAreLoading ? (
+          <LoadingAnimation />
+        ) : shownActivities.length > 0 && aarpData.activities.length > 0 ? (
           <>
             <a onClick={earnMaxDailyRewards}>Get max rewards</a>
             <div>
-              {activities
-                .slice(0, nActivitiesDisplayed)
-                .map((activity, idx) => (
-                  <Activity key={idx} activity={activity} />
-                ))}
+              {shownActivities.map(({ activityIdx, isCompleted }) => (
+                <Activity
+                  key={activityIdx}
+                  activityIdx={activityIdx}
+                  isCompleted={isCompleted}
+                />
+              ))}
             </div>
           </>
         ) : (
@@ -137,44 +157,22 @@ function AARP() {
 function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
-  const [activities, setActivities] = useState<AarpActivityWithStatus[]>([]);
+  const [activities, setActivities] = useState<AarpActivity[]>([]);
 
   const fullyLoggedIn = !isLoading && user && !user.userMustConfirmPassword;
 
   useEffect(() => {
-    // If a tab goes to an AARP url, we need to check to see if the user has changed and if the
-    const tabUpdateListener = (
-      _: any,
-      update: chrome.tabs.UpdateProperties,
-      tab: chrome.tabs.Tab
-    ) => {
-      console.log("[index.tsx] update user listener cdalled");
-      if (
-        tab.active &&
-        update.url &&
-        tab.status === "complete" &&
-        isAarpTab(tab.url)
-      ) {
-        if (!isLoading) setIsLoading(true);
-        getUser()
-          .then((newUser) => {
-            console.log("[index.tsx] got user from update user listner");
-            if (!simpleDeepCompare(user, newUser)) setUser(newUser);
-          })
-          .finally(() => setIsLoading(false));
+    getUser()
+      .then((newUser) => setUser(newUser))
+      .finally(() => setIsLoading(false));
+
+    // Listen for potential user changes from service worker
+    const removeUserUpdateListener = onPossibleUserUpdate((_, newUser) => {
+      if (!simpleDeepCompare(user, newUser)) {
+        setUser(newUser);
       }
-    };
-
-    console.log("[index.tsx] attached updated listener");
-    chrome.tabs.onUpdated.addListener(updateUserListener);
-
-    console.log(
-      "[index.tsx] inital update of aarp tab to trigger getting user"
-    );
-    // Trigger listener to get initial user and activiites
-    updateAarpTab({ active: true });
-
-    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
+    });
+    return removeUserUpdateListener;
   }, []);
 
   useEffect(() => {
@@ -184,8 +182,8 @@ function AARPDataProvider({ children }: PropsWithChildren) {
         maxNActivities: MAX_ACTIVITIES,
         accessToken: user.accessToken,
       })
-        .then((aarpActivities) => {
-          setActivities(aarpActivities);
+        .then((newActivities) => {
+          setActivities(newActivities);
         })
         .catch(() => setActivities([]));
     } else {

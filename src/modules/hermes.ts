@@ -99,7 +99,7 @@ type Callback<Data, ReturnValue> = (
 
 type Subscriber<Data, ReturnValue> = (
   callback: Callback<Data, ReturnValue>
-) => void;
+) => () => void; // Returns function to remove the listener
 
 const makeListener =
   <Data, ReturnValue>(
@@ -134,12 +134,9 @@ export const createMessage = <Data, ReturnValue>(
   identifier: string
 ): [(data: Data) => Promise<ReturnValue>, Subscriber<Data, ReturnValue>] => {
   const subscribe = (callback: Callback<Data, ReturnValue>) => {
-    const cb = makeListener(identifier, callback);
-    console.log(
-      "calling browserEnv.runtime.onMessage.addListener with",
-      cb.toString()
-    );
-    browserEnv.runtime.onMessage.addListener(cb);
+    const listener = makeListener(identifier, callback);
+    browserEnv.runtime.onMessage.addListener(listener);
+    return () => browserEnv.runtime.onMessage.removeListener(listener);
   };
 
   return [makeSend(identifier), subscribe];
@@ -152,12 +149,9 @@ export const createTabMessage = <Data, ReturnValue>(
   Subscriber<Data, ReturnValue>
 ] => {
   const subscribe = (callback: Callback<Data, ReturnValue>) => {
-    const cb = makeListener(identifier, callback);
-    console.log(
-      "calling browserEnv.runtime.onMessage.addListener with",
-      cb.toString()
-    );
-    browserEnv.runtime.onMessage.addListener(cb);
+    const listener = makeListener(identifier, callback);
+    browserEnv.runtime.onMessage.addListener(listener);
+    return () => browserEnv.runtime.onMessage.removeListener(listener);
   };
 
   return [makeTabSend(identifier), subscribe];
@@ -172,9 +166,9 @@ export const createExternalMessage = <Data, ReturnValue>(
   const send = makeSend(identifier);
 
   const subscribe = (callback: Callback<Data, ReturnValue>) => {
-    browserEnv.runtime.onMessageExternal.addListener(
-      makeListener(identifier, callback)
-    );
+    const listener = makeListener(identifier, callback);
+    browserEnv.runtime.onMessageExternal.addListener(listener);
+    return () => browserEnv.runtime.onMessageExternal.removeListener(listener);
   };
 
   return [

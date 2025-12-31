@@ -77,6 +77,13 @@ export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
   string | null
 >("getTabLocalStorage");
 
+// Sidebar script message definitions -------------------------------------------------------------
+
+export const [sendPossibleUserUpdate, onPossibleUserUpdate] = createTabMessage<
+  AarpUser | null,
+  void
+>("possibleUserUpdate");
+
 // Service worker message definitions -------------------------------------------------------------
 
 export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
@@ -110,3 +117,6 @@ export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   },
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");
+
+export const [alertPossibleUserChange, onPossibleUserChangeAlert] =
+  createMessage<void, void>("possibleUserChangeAlert");

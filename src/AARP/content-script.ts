@@ -1,4 +1,7 @@
-import { onTabLocalStorageRequest } from "./modules/definitions";
+import {
+  alertPossibleUserChange,
+  onTabLocalStorageRequest,
+} from "./modules/definitions";
 
 onTabLocalStorageRequest(async (sendResponse, key) => {
   console.log("recieved request for tab local storage entry:", key);
@@ -6,5 +9,13 @@ onTabLocalStorageRequest(async (sendResponse, key) => {
   return sendResponse(localStorage.getItem(key));
 });
 
-// Make it so that on every aarp page load, it sends an updated user variable to service worker so
-// or on tab update, get user and somehow send to index.tsx
+// Add listeners for localStorage or cookie changes to alert the service worker
+// (which will then check if user has been updated)
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (false) alertPossibleUserChange();
+});
+
+chrome.cookies.onChanged.addListener((change) => {
+  if (false) alertPossibleUserChange();
+});

@@ -11,14 +11,18 @@ import {
   onActivityStatusesRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
+  onPossibleUserChangeAlert,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
+  sendPossibleUserUpdate,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
 } from "./modules/definitions";
 import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
 
 console.log("hello from service worker");
+
+// Utilities --------------------------------------------------------------------------------------
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
@@ -56,6 +60,14 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
     });
   });
 }
+
+async function getSidebarTabs(): Promise<number[]> {
+  return (await chrome.tabs.query({}))
+    .filter((tab) => typeof tab.id === "number")
+    .map((tab) => tab.id ?? 0);
+}
+
+// Message functions ------------------------------------------------------------------------------
 
 async function updateAarpTab(
   update: chrome.tabs.UpdateProperties
@@ -258,3 +270,10 @@ onEarnRewardsRequest(
   async (sendResponse, { activity, openActivityUrl, user }) =>
     sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
 );
+
+onPossibleUserChangeAlert(async () => {
+  const user = await getUser();
+  (await getSidebarTabs()).forEach((tabId) =>
+    sendPossibleUserUpdate(user, tabId)
+  );
+});
