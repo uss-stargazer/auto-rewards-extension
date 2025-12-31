@@ -95,11 +95,10 @@ function AARP() {
       </div>
     );
 
-  const [activitiesAreLoading, setActivitiesAreLoading] =
-    useState<boolean>(true);
-  const [shownActivities, setShownActivities] = useState<
-    { activityIdx: number; isCompleted: boolean }[]
-  >([]);
+  const [activitiesAreLoading, setActivitiesAreLoading] = [false, false];
+  useState<boolean>(true);
+  const [completedActivities, setCompletedActivities] = useState<number[]>([]);
+  const [shownActivities, setShownActivities] = useState<number[]>([]);
 
   // some useEffect here to populate shown activities and get status for all of em before populating
 
@@ -133,16 +132,12 @@ function AARP() {
       <div>
         {activitiesAreLoading ? (
           <LoadingAnimation />
-        ) : shownActivities.length > 0 && aarpData.activities.length > 0 ? (
+        ) : aarpData.activities.length > 0 ? (
           <>
             <a onClick={earnMaxDailyRewards}>Get max rewards</a>
             <div>
-              {shownActivities.map(({ activityIdx, isCompleted }) => (
-                <Activity
-                  key={activityIdx}
-                  activityIdx={activityIdx}
-                  isCompleted={isCompleted}
-                />
+              {aarpData.activities.slice(0, 10).map((acitivity, idx) => (
+                <Activity key={idx} activityIdx={idx} isCompleted={false} />
               ))}
             </div>
           </>
