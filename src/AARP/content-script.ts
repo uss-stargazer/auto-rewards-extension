@@ -12,10 +12,15 @@ onTabLocalStorageRequest(async (sendResponse, key) => {
 // Add listeners for localStorage or cookie changes to alert the service worker
 // (which will then check if user has been updated)
 
+const USER_STORAGE_KEYS = // import from definitions
+const USER_COOKIES =
+
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (false) alertPossibleUserChange();
+  if (changes.keys().some((key) => USER_STORAGE_KEYS.includes(key))) 
+    alertPossibleUserChange();
 });
 
 chrome.cookies.onChanged.addListener((change) => {
-  if (false) alertPossibleUserChange();
+  if (USER_COOKIES.includes(change.cookie.name))
+    alertPossibleUserChange();
 });
