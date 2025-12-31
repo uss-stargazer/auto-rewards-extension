@@ -94,7 +94,8 @@ const makeTabSend =
 
 type Callback<Data, ReturnValue> = (
   sendResponse: (r: ReturnValue) => ReturnValue,
-  data: Data
+  data: Data,
+  sender: MessageSender
 ) => Promise<ReturnValue> | ReturnValue;
 
 type Subscriber<Data, ReturnValue> = (
@@ -126,7 +127,7 @@ const makeListener =
       return r;
     };
 
-    callback(sendResponse, data);
+    callback(sendResponse, data, sender);
     return true;
   };
 

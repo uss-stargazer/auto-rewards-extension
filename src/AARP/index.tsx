@@ -15,6 +15,7 @@ import {
   getUser,
   onPossibleUserUpdate,
   updateAarpTab,
+  updateSidepanelTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL, isAarpTab } from "./modules/tools";
@@ -157,17 +158,27 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const fullyLoggedIn = !isLoading && user && !user.userMustConfirmPassword;
 
   useEffect(() => {
+    updateSidepanelTab("register"); // Registers the current tab as sidepanel
+
     getUser()
       .then((newUser) => setUser(newUser))
       .finally(() => setIsLoading(false));
 
     // Listen for potential user changes from service worker
     const removeUserUpdateListener = onPossibleUserUpdate((_, newUser) => {
+      console.log("[index.tsx] got user update", newUser);
       if (!simpleDeepCompare(user, newUser)) {
+        console.log("[index.tsx] updated user has changed so setting user");
         setUser(newUser);
+      } else {
+        console.log("[index.tsx] updated user has not changed");
       }
     });
-    return removeUserUpdateListener;
+
+    return () => {
+      removeUserUpdateListener();
+      updateSidepanelTab("unregister");
+    };
   }, []);
 
   useEffect(() => {

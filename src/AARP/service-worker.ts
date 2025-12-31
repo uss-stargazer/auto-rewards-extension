@@ -4,6 +4,7 @@ import {
   AarpActivityStatuses,
   AarpRewardsResponse,
   AarpUser,
+  ACCESS_TOKEN_STORAGE_KEYS,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
@@ -12,11 +13,13 @@ import {
   onEarnRewardsRequest,
   onGetUserRequest,
   onPossibleUserChangeAlert,
+  onSidepanelTabUpdate,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
   sendPossibleUserUpdate,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
+  USER_COOKIES,
 } from "./modules/definitions";
 import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
 
@@ -61,12 +64,6 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
-async function getSidebarTabs(): Promise<number[]> {
-  return (await chrome.tabs.query({}))
-    .filter((tab) => typeof tab.id === "number")
-    .map((tab) => tab.id ?? 0);
-}
-
 // Message functions ------------------------------------------------------------------------------
 
 async function updateAarpTab(
@@ -86,13 +83,7 @@ async function updateAarpTab(
 async function getUser(): Promise<AarpUser | null> {
   console.log("[background, getUser] getting user object");
   const aarpTab = await getAarpTab();
-  const cookies = await [
-    "games",
-    "fedid",
-    "aarp_rewards_balance",
-    "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
-    "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
-  ].reduce<
+  const cookies = await USER_COOKIES.reduce<
     Promise<{
       [key: string]: string | null;
     }>
@@ -105,8 +96,8 @@ async function getUser(): Promise<AarpUser | null> {
   console.log("[background, getUser] got cookies:", cookies);
 
   const accessToken =
-    (await getTabLocalStorage("access_token", aarpTab.id!)) ??
-    (await getTabLocalStorage("acctAccessToken", aarpTab.id!));
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[0], aarpTab.id!)) ??
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[1], aarpTab.id!));
 
   console.log("[background, getUser] got access token:", accessToken);
 
@@ -249,7 +240,7 @@ async function earnActivityRewards(
   );
 }
 
-// Register message listeners -----------------------------------------------
+// Register functional message listeners ----------------------------------------------------------
 
 onUpdateAarpTabRequest(async (sendResponse, update) =>
   sendResponse(await updateAarpTab(update))
@@ -271,9 +262,40 @@ onEarnRewardsRequest(
     sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
 );
 
-onPossibleUserChangeAlert(async () => {
+// Register message listeners involving side panel and content commmunication ---------------------
+
+const sidepanelTabIds: number[] = [];
+
+onSidepanelTabUpdate(async (sendResponse, update, sender) => {
+  if (sender.tab === undefined || sender.tab.id === undefined)
+    throw new Error("Cannot access the tab id from sidebarTabUpdate message");
+
+  const tabId = sender.tab.id;
+  const sidebarIdx = sidepanelTabIds.indexOf(tabId);
+  switch (update) {
+    case "register":
+      console.log("[background, sidepanelTabUpdate] registering", sender.tab);
+      if (sidebarIdx < 0) sidepanelTabIds.push(tabId);
+      return sendResponse();
+    case "unregister":
+      console.log("[background, sidepanelTabUpdate] unregistering", sender.tab);
+      if (sidebarIdx >= 0) sidepanelTabIds.splice(sidebarIdx, 1);
+      return sendResponse();
+  }
+});
+
+onPossibleUserChangeAlert(async (sendResponse) => {
+  console.log("[background, userChangeAlert] got possible user change alert");
   const user = await getUser();
-  (await getSidebarTabs()).forEach((tabId) =>
-    sendPossibleUserUpdate(user, tabId)
+  console.log("[background, userChangeAlert] got current user", user);
+  sidepanelTabIds.forEach(
+    /*delteme! */ async (tabId) => {
+      console.log(
+        "[background, userChangeAlert] sending user update to",
+        await chrome.tabs.get(tabId)
+      );
+      sendPossibleUserUpdate(user, tabId);
+    }
   );
+  return sendResponse();
 });
