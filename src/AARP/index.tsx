@@ -1,56 +1,68 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  act,
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   AarpActivity,
+  AarpActivityWithStatus,
   AarpUser,
   earnActivityRewards,
   getActivities,
-  getActivityStatus,
   getUser,
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL, isAarpTab } from "./modules/tools";
+import { simpleDeepCompare } from "../modules/utils";
+
+type AARPData =
+  | {
+      status: "loggedIn" | "mustConfirmPassword";
+      user: AarpUser;
+      activities: AarpActivityWithStatus[];
+    }
+  | { status: "notLoggedIn" };
 
 const MAX_DAILY_REWARDS = 5000;
 const ACTIVITIES_CHUNK_SIZE = 5;
-const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
+const MAX_ACTIVITIES = 4000; // Should never really get beyond this, but just a cut off in that case
 
-  function NotLoggedInPrompt({user}: {user: Extract<AarpUser, {userMustConfirmPassword: true}> | null}) {return  (
-    <div>
-      <h2>{user ? `You are logged in as ${user.username}, but you need to confirm your password.` : "You are not logged into AARP."}</h2>
-      <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
-    </div>
-  );}
+const AARPDataContext = createContext<AARPData | "loading">("loading");
 
-function Activity({ activity }: { activity: AarpActivity }) {
-  const [isComplete, setIsComplete] = useState<boolean>();
+function Activity({ activityIdx }: { activityIdx: number }) {
+  const aarpData = useContext(AARPDataContext);
 
-  useEffect(() => {
-    if (!isComplete) {
-      getActivityStatus(activity.identifier).then((status) =>
-        setIsComplete(status.completed)
-      );
-    }
-  }, [isComplete]);
+  if (aarpData === "loading" || aarpData.status !== "loggedIn")
+    throw new Error(
+      "To create <Activity/>, AARP must have finished loading and must be logged into"
+    );
+
+  const activity = aarpData.activities[activityIdx];
+  if (!activity) throw RangeError("<Activity/> activityIdx out of bounds");
 
   return (
     <div>
       <div>
         <h4>{activity.name}</h4>
-        {isComplete ? (
+        {activity.isCompleted ? (
           <p>Completed</p>
         ) : (
           <p>{activity.activityType.basePointValue}</p>
         )}
       </div>
       <p>{activity.description}</p>
-      {isComplete || (
+      {activity.isCompleted || (
         <a
           onClick={() =>
             earnActivityRewards({
-              activity: activity,
+              activity: { ...activity, type: activity.activityType.identifier },
               openActivityUrl: true,
-            }).then(() => setIsComplete(true))
+              user: { ...aarpData.user },
+            })
           }
         >
           Get rewards
@@ -60,54 +72,37 @@ function Activity({ activity }: { activity: AarpActivity }) {
   );
 }
 
-export function AARP() {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<AarpUser | null>(null);
-  const [activities, setActivities] = useState<AarpActivity[]>([]);
+function AARP() {
+  const aarpData = useContext(AARPDataContext);
   const [nActivitiesDisplayed, setNActivitiesDisplayed] = useState<number>(
     ACTIVITIES_CHUNK_SIZE
   );
 
-  useEffect(() => {
-    console.log("updating user");
-    const updateUserListener = (_, _, tab: chrome.tabs.Tab) => { 
-      if (isAarpTab(tab.url)) {
-        setIsLoading(true);
-        getUser()
-          .then((user) => setUser(user))
-          .finally(() => setIsLoading(false));
-      }
-    }
-    chrome.tabs.onUpdated.addListener(updateUserListener);
-    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      console.log("getting activities");
-      getActivities(MAX_ACTIVITIES)
-        .then((aarpActivities) => {
-          console.log("setting activities");
-          setActivities(aarpActivities);
-        })
-        .catch(() => setActivities([]));
-    } else {
-      setActivities([]);
-    }
-  }, [user]);
-
-
-
-  if (!user || user.userMustConfirmPassword)
-    return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt user={user} />;
+  if (aarpData === "loading") return <LoadingAnimation />;
+  if (aarpData.status !== "loggedIn")
+    return (
+      <div>
+        <h2>
+          {aarpData.status === "mustConfirmPassword"
+            ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
+            : "You are not logged into AARP."}
+        </h2>
+        <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
+      </div>
+    );
 
   const earnMaxDailyRewards = async () => {
-    if (user && activities) {
-      let dailyRewardsLeft = user.dailyRewardsLeft;
+    if (aarpData.activities) {
+      let dailyRewardsLeft =
+        aarpData.user.dailyRewardsAvailable ?? MAX_DAILY_REWARDS;
       let activityIdx = 0;
-      while (activities[activityIdx] && dailyRewardsLeft > 0) {
-        const rewards = await earnActivityRewards(activities[activityIdx]);
-        dailyRewardsLeft -= rewards.rewardsEarned;
+      while (aarpData.activities[activityIdx] && dailyRewardsLeft > 0) {
+        const rewards = await earnActivityRewards({
+          activity: aarpData.activities[activityIdx],
+          openActivityUrl: false,
+        });
+        if (rewards && rewards.success)
+          dailyRewardsLeft = rewards.userDailyPointsLeft;
         activityIdx++;
       }
     }
@@ -139,90 +134,89 @@ export function AARP() {
   );
 }
 
-// function AARP() {
-//   return (
-//     <>
-//       <button
-//         onClick={() =>
-//           updateAarpTab({
-//             url: "https://www.aarp.org/afslfja/afdsa/fds/",
-//             active: true,
-//           }).then((tabid) =>
-//             chrome.tabs
-//               .get(tabid)
-//               .then((tab) => console.log("index.tsx: got updated tab:", tab))
-//           )
-//         }
-//       >
-//         update aarp tab to https://www.aarp.org/afslfja/afdsa/fds/
-//       </button>
+function AARPDataProvider({ children }: PropsWithChildren) {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<AarpUser | null>(null);
+  const [activities, setActivities] = useState<AarpActivityWithStatus[]>([]);
 
-//       <button
-//         onClick={() =>
-//           getUser().then((user) => console.log("index.tsx: got user:", user))
-//         }
-//       >
-//         G3t user
-//       </button>
+  const fullyLoggedIn = !isLoading && user && !user.userMustConfirmPassword;
 
-//       <button
-//         onClick={() =>
-//           getActivities(20).then((activities) =>
-//             console.log("index.tsx: get activities:", activities)
-//           )
-//         }
-//       >
-//         G3t activtiies (20)
-//       </button>
+  useEffect(() => {
+    // If a tab goes to an AARP url, we need to check to see if the user has changed and if the
+    const tabUpdateListener = (
+      _: any,
+      update: chrome.tabs.UpdateProperties,
+      tab: chrome.tabs.Tab
+    ) => {
+      console.log("[index.tsx] update user listener cdalled");
+      if (
+        tab.active &&
+        update.url &&
+        tab.status === "complete" &&
+        isAarpTab(tab.url)
+      ) {
+        if (!isLoading) setIsLoading(true);
+        getUser()
+          .then((newUser) => {
+            console.log("[index.tsx] got user from update user listner");
+            if (!simpleDeepCompare(user, newUser)) setUser(newUser);
+          })
+          .finally(() => setIsLoading(false));
+      }
+    };
 
-//       <button
-//         onClick={() =>
-//           getActivityStatus("fjdkla;f").then((status) =>
-//             console.log("index.ts: get activity status:", status)
-//           )
-//         }
-//       >
-//         get activity status with bad id
-//       </button>
+    console.log("[index.tsx] attached updated listener");
+    chrome.tabs.onUpdated.addListener(updateUserListener);
 
-//       <button
-//         onClick={() =>
-//           earnActivityRewards({
-//             activity: {
-//               identifier: "jfdkaljfkld;",
-//               startDate: "2019-07-11T01:00:00.000Z",
-//               endDate: "2031-01-01T04:59:00.000Z",
-//               activityType: {
-//                 identifier: "monthlyFitness",
-//                 basePointValue: 1000,
-//                 name: "Fitness Tracker",
-//                 visibleOnSite: true,
-//                 active: true,
-//               },
+    console.log(
+      "[index.tsx] inital update of aarp tab to trigger getting user"
+    );
+    // Trigger listener to get initial user and activiites
+    updateAarpTab({ active: true });
 
-//               name: "Bike 250 miles in a month",
-//               category: "health",
-//               url: "https://www.aarp.org/rewards/earn/fitness/bike/",
-//               imageUrl:
-//                 "https://cdn.aarp.net/content/dam/aarp/rewards/earn-activities/2019/sports-cooler.svg",
-//               description:
-//                 "Crush this goal by the end of the month. Let's do it!",
-//               primaryTopic: "Fitness",
-//               active: true,
-//               deleted: false,
-//               membersOnly: false,
-//             },
-//             openActivityUrl: true,
-//           }).then((rewards) => console.log("index.tsx: earn rewards:", rewards))
-//         }
-//       >
-//         Earn rewards with bad activity
-//       </button>
-//     </>
-//   );
-// }
+    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
+  }, []);
+
+  useEffect(() => {
+    if (fullyLoggedIn) {
+      console.log("[index.tsx] set activities useEffect has been called");
+      getActivities({
+        maxNActivities: MAX_ACTIVITIES,
+        accessToken: user.accessToken,
+      })
+        .then((aarpActivities) => {
+          setActivities(aarpActivities);
+        })
+        .catch(() => setActivities([]));
+    } else {
+      setActivities([]);
+    }
+  }, [user]);
+
+  const aarpData: AARPData | "loading" = isLoading
+    ? "loading"
+    : user
+    ? {
+        status: user.userMustConfirmPassword
+          ? "mustConfirmPassword"
+          : "loggedIn",
+        activities: activities,
+        user: user,
+      }
+    : { status: "notLoggedIn" };
+
+  return (
+    <AARPDataContext.Provider value={aarpData}>
+      {children}
+    </AARPDataContext.Provider>
+  );
+}
 
 export default {
   name: "AARP",
-  element: <AARP />,
+  element: (
+    <AARPDataProvider>
+      <AARP />
+    </AARPDataProvider>
+  ),
 };

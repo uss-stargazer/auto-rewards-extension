@@ -1,15 +1,8 @@
 import * as z from "zod";
 import { createMessage, createTabMessage } from "../../modules/hermes";
 
-export class NotLoggedInError extends Error {
-  name: string = "NotLoggedInError";
-  loginUrl: string;
-
-  constructor(message: string, loginUrl: string) {
-    super(message);
-    this.loginUrl = loginUrl;
-  }
-}
+export const SUPPORTED_ACTIVITY_TYPES = ["video"] as const;
+export type SupportedActivityType = (typeof SUPPORTED_ACTIVITY_TYPES)[number];
 
 // Types and schemas ------------------------------------------------------------------------------
 
@@ -45,12 +38,28 @@ const ActivitySchema = z.object({
   membersOnly: z.boolean(),
 });
 export type AarpActivity = z.infer<typeof ActivitySchema>;
+export type AarpActivityWithStatus = z.infer<typeof ActivitySchema> & {
+  isCompleted: boolean;
+};
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
-export const ActivityStatusResponseSchema = z.object({});
-export type AarpActivityStatusResponse = z.infer<
-  typeof ActivityStatusResponseSchema
->;
+export const ActivityStatusResponseSchema = z.object({
+  activityList: z.array(
+    z.object({
+      activityIdentifier: z.uuid(),
+      limitHit: z.boolean(),
+      Error: z.nullable(z.any()),
+      Input: z.nullable(z.any()),
+    })
+  ),
+  userDailyPointsLeft: z.number(),
+  exceptionCount: z.number(),
+  success: z.boolean(),
+});
+export type AarpActivityStatuses = {
+  activityFinishedStatuses: (boolean | undefined)[]; // A undefined value usually signifies error
+  userDailyPointsLeft: number | undefined;
+};
 
 export const RewardsResponseSchema = z.object({
   activityCompleted: z.uuid(),
@@ -80,16 +89,24 @@ export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
 );
 
 export const [getActivities, onActivitiesRequest] = createMessage<
-  number,
+  { accessToken: string; maxNActivities: number },
   AarpActivity[]
 >("getAarpActivites");
 
-export const [getActivityStatus, onActivityStatusRequest] = createMessage<
-  string,
-  AarpActivityStatusResponse
->("getAarpActivityStatus");
+export const [getActivityStatuses, onActivityStatusesRequest] = createMessage<
+  {
+    activityIds: string[];
+    userFedId: string;
+    accessToken: string;
+  },
+  AarpActivityStatuses
+>("getAarpActivityStatuses");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
-  { activity: AarpActivity; openActivityUrl: boolean },
+  {
+    activity: { identifier: string; type: string; url: string };
+    openActivityUrl: boolean;
+    user: { fedId: string; accessToken: string };
+  },
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");

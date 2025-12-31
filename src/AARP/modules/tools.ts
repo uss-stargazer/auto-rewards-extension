@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { AarpUser } from "./definitions";
 
 export const ORIGIN = "https://www.aarp.org";
 export const LOGIN_URL = "https://secure.aarp.org/applications/user/login";
