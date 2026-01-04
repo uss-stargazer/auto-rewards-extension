@@ -104,14 +104,16 @@ function AARP() {
       </div>
     );
 
-  const [activitiesFilter, setActivitiesFilter] = useState<ActivitiesFilter>({
-    numberDisplayed: ACTIVITIES_CHUNK_SIZE,
-  });
+  const [activitiesFilter, setActivitiesFilter] = //
+    useState<ActivitiesFilter>({});
   const [activitiesAreLoading, setActivitiesAreLoading] =
     useState<boolean>(true);
   const [shownActivities, setShownActivities] = useState<
     { activityIdx: number; status: ActivityStatus }[]
   >([]);
+  const [nActivitiesShown, setNActivitiesShown] = useState<number>(
+    ACTIVITIES_CHUNK_SIZE
+  );
 
   console.log(
     "[index.tsx, AARP display obj] AARP activities settings reloaded:",
@@ -119,10 +121,7 @@ function AARP() {
   );
 
   useEffect(() => {
-    if (
-      aarpData.activities.length > 0 &&
-      activitiesFilter.numberDisplayed > 0
-    ) {
+    if (aarpData.activities.length > 0 && nActivitiesShown > 0) {
       console.log(
         "[index.tsx, getShownActivities] applying filter and fetching statuses"
       );
@@ -203,18 +202,29 @@ function AARP() {
       <div>
         {activitiesAreLoading ? (
           <LoadingAnimation />
-        ) : aarpData.activities.length > 0 && shownActivities.length > 0 ? (
+        ) : aarpData.activities.length > 0 ? (
           <>
             <a onClick={earnMaxDailyRewards}>Earn max daily rewards</a>
             <div>
-              {shownActivities.map(({ activityIdx, status }) => (
-                <Activity
-                  key={activityIdx}
-                  activityIdx={activityIdx}
-                  status={status}
-                />
-              ))}
+              {nActivitiesShown > 0 ? (
+                shownActivities.map(({ activityIdx, status }) => (
+                  <Activity
+                    key={activityIdx}
+                    activityIdx={activityIdx}
+                    status={status}
+                  />
+                ))
+              ) : (
+                <p>Showing 0 activities</p>
+              )}
             </div>
+            <button
+              onClick={() =>
+                setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
+              }
+            >
+              Show more
+            </button>
           </>
         ) : (
           <p>No activities found.</p>
