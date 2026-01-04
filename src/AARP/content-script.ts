@@ -2,7 +2,6 @@ import {
   ACCESS_TOKEN_STORAGE_KEYS,
   alertPossibleUserChange,
   onTabLocalStorageRequest,
-  USER_COOKIES,
 } from "./modules/definitions";
 
 onTabLocalStorageRequest(async (sendResponse, key) => {
@@ -11,29 +10,21 @@ onTabLocalStorageRequest(async (sendResponse, key) => {
   return sendResponse(localStorage.getItem(key));
 });
 
-// Add listeners for localStorage or cookie changes to alert the service worker
-// (which will then check if user has been updated)
+// Add listeners for localStorage to alert the service worker that the user may have changed
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  console.log("[AARP content] got", areaName, "storage changes", changes);
+window.addEventListener("storage", (event) => {
+  console.log(
+    "[content, storage listener] got",
+    event.storageArea,
+    "storage changes",
+    event.key
+  );
   if (
-    areaName === "local" &&
-    Object.keys(changes).some((key) => ACCESS_TOKEN_STORAGE_KEYS.includes(key))
+    event.storageArea === localStorage &&
+    ACCESS_TOKEN_STORAGE_KEYS.includes(event.key!)
   ) {
     console.log(
-      "[AARP content] identified local storage changes as possible user change and sent alert"
-    );
-    alertPossibleUserChange();
-  }
-});
-
-chrome.cookies.onChanged.addListener((change) => {
-  console.log("[AARP content] got cookie change", change);
-  if (USER_COOKIES.includes(change.cookie.name)) {
-    console.log(
-      "[AARP content] identified cookie change",
-      change.cookie.name,
-      "as possible user change and sent alert"
+      "[content, storage listener] identified local storage changes as possible user change and sent alert"
     );
     alertPossibleUserChange();
   }

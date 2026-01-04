@@ -13,9 +13,7 @@ import {
   earnActivityRewards,
   getActivities,
   getUser,
-  onPossibleUserUpdate,
   updateAarpTab,
-  updateSidepanelTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL, isAarpTab } from "./modules/tools";
@@ -155,29 +153,40 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivity[]>([]);
 
+  console.log("[index.tsx] AARP data reloaded:", {
+    isLoading,
+    user,
+    activities,
+  });
+
   const fullyLoggedIn = !isLoading && user && !user.userMustConfirmPassword;
 
   useEffect(() => {
-    updateSidepanelTab("register"); // Registers the current tab as sidepanel
-
     getUser()
       .then((newUser) => setUser(newUser))
       .finally(() => setIsLoading(false));
 
-    // Listen for potential user changes from service worker
-    const removeUserUpdateListener = onPossibleUserUpdate((_, newUser) => {
+    // Listen for potential user changes from service worker (via a port)
+    const userUpdateListener = (newUser: AarpUser | null) => {
       console.log("[index.tsx] got user update", newUser);
       if (!simpleDeepCompare(user, newUser)) {
         console.log("[index.tsx] updated user has changed so setting user");
         setUser(newUser);
       } else {
-        console.log("[index.tsx] updated user has not changed");
+        console.log(
+          "[index.tsx] updated user has not changed. user:",
+          user,
+          " |  updated user:",
+          newUser
+        );
       }
-    });
+    };
+    const port = chrome.runtime.connect({ name: "sidepanel-port" });
+    port.onMessage.addListener(userUpdateListener);
 
     return () => {
-      removeUserUpdateListener();
-      updateSidepanelTab("unregister");
+      port.onMessage.removeListener(userUpdateListener);
+      port.disconnect();
     };
   }, []);
 

@@ -13,10 +13,8 @@ import {
   onEarnRewardsRequest,
   onGetUserRequest,
   onPossibleUserChangeAlert,
-  onSidepanelTabUpdate,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
-  sendPossibleUserUpdate,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
   USER_COOKIES,
@@ -264,38 +262,54 @@ onEarnRewardsRequest(
 
 // Register message listeners involving side panel and content commmunication ---------------------
 
-const sidepanelTabIds: number[] = [];
+let sidepanelPort: chrome.runtime.Port | null = null;
 
-onSidepanelTabUpdate(async (sendResponse, update, sender) => {
-  if (sender.tab === undefined || sender.tab.id === undefined)
-    throw new Error("Cannot access the tab id from sidebarTabUpdate message");
+chrome.runtime.onConnect.addListener(function (port) {
+  console.log("Side panel connected:", port.name);
+  if (port.name === "sidepanel-port") {
+    sidepanelPort = port;
 
-  const tabId = sender.tab.id;
-  const sidebarIdx = sidepanelTabIds.indexOf(tabId);
-  switch (update) {
-    case "register":
-      console.log("[background, sidepanelTabUpdate] registering", sender.tab);
-      if (sidebarIdx < 0) sidepanelTabIds.push(tabId);
-      return sendResponse();
-    case "unregister":
-      console.log("[background, sidepanelTabUpdate] unregistering", sender.tab);
-      if (sidebarIdx >= 0) sidepanelTabIds.splice(sidebarIdx, 1);
-      return sendResponse();
+    // Optional: Handle port disconnection (e.g., when the side panel is closed)
+    sidepanelPort.onDisconnect.addListener(function () {
+      console.log("Side panel disconnected");
+      sidepanelPort = null;
+    });
   }
 });
 
-onPossibleUserChangeAlert(async (sendResponse) => {
+// When user actually changes a lot of little changes happen in a short period so instead of fetching user and sending to
+// sidepanel for each, set a timeout that waits a little after each request before finally executing when it slows.
+const USER_UPDATE_BUFFER_MS = 1000;
+let sendUserUpdateTimeout: NodeJS.Timeout | null = null;
+
+function onPossibleUserChange() {
   console.log("[background, userChangeAlert] got possible user change alert");
-  const user = await getUser();
-  console.log("[background, userChangeAlert] got current user", user);
-  sidepanelTabIds.forEach(
-    /*delteme! */ async (tabId) => {
+  if (sendUserUpdateTimeout) clearTimeout(sendUserUpdateTimeout);
+  sendUserUpdateTimeout = setTimeout(async () => {
+    if (sidepanelPort) {
+      const user = await getUser();
       console.log(
-        "[background, userChangeAlert] sending user update to",
-        await chrome.tabs.get(tabId)
+        "[background, userChangeAlert] got current user",
+        user,
+        "and sending update"
       );
-      sendPossibleUserUpdate(user, tabId);
+      sidepanelPort.postMessage(user);
     }
-  );
-  return sendResponse();
+  }, USER_UPDATE_BUFFER_MS);
+}
+
+onPossibleUserChangeAlert(async (sendResponse) =>
+  sendResponse(onPossibleUserChange())
+);
+
+chrome.cookies.onChanged.addListener((change) => {
+  console.log("[background, cookie listener] got cookie change", change);
+  if (USER_COOKIES.includes(change.cookie.name)) {
+    console.log(
+      "[background, cookie listener] identified cookie change",
+      change.cookie.name,
+      "as possible user change and sent alert"
+    );
+    onPossibleUserChange();
+  }
 });

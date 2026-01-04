@@ -86,13 +86,6 @@ export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
   string | null
 >("getTabLocalStorage");
 
-// Sidebar script message definitions -------------------------------------------------------------
-
-export const [sendPossibleUserUpdate, onPossibleUserUpdate] = createTabMessage<
-  AarpUser | null,
-  void
->("possibleUserUpdate");
-
 // Service worker message definitions -------------------------------------------------------------
 
 export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
@@ -127,13 +120,8 @@ export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");
 
-// The following two are still service worker messages but
-// are more for background mechanisms, not AARP functions
+// The following is still a service worker message but
+// is more a background mechanism, not an AARP functions
 
 export const [alertPossibleUserChange, onPossibleUserChangeAlert] =
   createMessage<void, void>("possibleUserChangeAlert");
-
-export const [updateSidepanelTab, onSidepanelTabUpdate] = createMessage<
-  "register" | "unregister",
-  void
->("sidepanelTabUpdate");
