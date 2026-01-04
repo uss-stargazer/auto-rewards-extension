@@ -100,7 +100,9 @@ function AARP() {
             ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
             : "You are not logged into AARP."}
         </h2>
-        <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
+        <a onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}>
+          Log in
+        </a>
       </div>
     );
 
@@ -108,9 +110,7 @@ function AARP() {
     useState<ActivitiesFilter>({});
   const [activitiesAreLoading, setActivitiesAreLoading] =
     useState<boolean>(true);
-  const [shownActivities, setShownActivities] = useState<
-    { activityIdx: number; status: ActivityStatus }[]
-  >([]);
+  const [filteredActivities, setFilteredActivities] = useState<number[]>([]);
   const [nActivitiesShown, setNActivitiesShown] = useState<number>(
     ACTIVITIES_CHUNK_SIZE
   );
@@ -218,14 +218,14 @@ function AARP() {
                 <p>Showing 0 activities</p>
               )}
             </div>
-	    <div>
-              <button 
-	        onClick={
+            <div>
+              <button
+                onClick={() =>
                   setNActivitiesShown(nActivitiesShown - ACTIVITIES_CHUNK_SIZE)
-		}
+                }
               >
-	        Show less
-	      </button>
+                Show less
+              </button>
               <button
                 onClick={() =>
                   setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
