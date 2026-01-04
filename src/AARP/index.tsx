@@ -218,13 +218,22 @@ function AARP() {
                 <p>Showing 0 activities</p>
               )}
             </div>
-            <button
-              onClick={() =>
-                setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
-              }
-            >
-              Show more
-            </button>
+	    <div>
+              <button 
+	        onClick={
+                  setNActivitiesShown(nActivitiesShown - ACTIVITIES_CHUNK_SIZE)
+		}
+              >
+	        Show less
+	      </button>
+              <button
+                onClick={() =>
+                  setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
+                }
+              >
+                Show more
+              </button>
+            </div>
           </>
         ) : (
           <p>No activities found.</p>
