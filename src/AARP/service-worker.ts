@@ -217,7 +217,6 @@ async function getActivityStatuses(
 
 async function earnActivityRewards(
   activity: { identifier: string; type: string; url: string },
-  openActivityUrl: boolean,
   user: { fedId: string; accessToken: string }
 ): Promise<AarpRewardsResponse | null> {
   console.log("earn activity rewards for", activity.identifier);
@@ -226,8 +225,6 @@ async function earnActivityRewards(
     !SUPPORTED_ACTIVITY_TYPES.includes(activity.type as SupportedActivityType)
   )
     return null;
-
-  if (openActivityUrl) await updateAarpTab({ url: activity.url });
 
   return await queryAarpApi(
     ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
@@ -255,9 +252,8 @@ onActivityStatusesRequest(
     sendResponse(await getActivityStatuses(activityIds, userFedId, accessToken))
 );
 
-onEarnRewardsRequest(
-  async (sendResponse, { activity, openActivityUrl, user }) =>
-    sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
+onEarnRewardsRequest(async (sendResponse, { activity, user }) =>
+  sendResponse(await earnActivityRewards(activity, user))
 );
 
 // Register message listeners involving side panel and content commmunication ---------------------

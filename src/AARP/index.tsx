@@ -74,8 +74,11 @@ function Activity({
           onClick={() =>
             earnActivityRewards({
               activity: { ...activity, type: activity.activityType.identifier },
-              openActivityUrl: true,
               user: { ...aarpData.user },
+            }).then((rewardsResponse) => {
+              // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
+
+              updateAarpTab({ url: activity.url });
             })
           }
         >
@@ -116,7 +119,6 @@ function AARP() {
     { activitiesFilter, activitiesAreLoading, shownActivities }
   );
 
-  // some useEffect here to populate shown activities and get status for all of em before populating
   useEffect(() => {
     if (
       aarpData.activities.length > 0 &&
@@ -127,55 +129,51 @@ function AARP() {
       );
       setActivitiesAreLoading(true);
 
-      const getShownActivitiesFailed = (reason: any) => {
-        setShownActivities([]);
-        setActivitiesAreLoading(false);
-        console.error("Failed to get shown activities:", reason);
+      const populateShownActivities = async () => {
+        const filteredActivityIdxs = applyActivitiesFilter(
+          aarpData.activities,
+          activitiesFilter
+        );
+        console.log(
+          "[index.tsx, getShownActivities] filter has been applied:",
+          filteredActivityIdxs
+        );
+        const activityStatuses = await getActivityStatuses({
+          activityIds: filteredActivityIdxs.map(
+            (idx) => aarpData.activities[idx].identifier
+          ),
+          userFedId: aarpData.user.fedId,
+          accessToken: aarpData.user.accessToken,
+        });
+        // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
+        console.log(
+          "[index.tsx, getShownActivities] activity statuses have been fetched:",
+          activityStatuses
+        );
+        setShownActivities(
+          filteredActivityIdxs.map((idx) => {
+            const activityIsComplete =
+              activityStatuses.activityFinishedStatuses[idx];
+            return {
+              activityIdx: idx,
+              status:
+                activityIsComplete === undefined
+                  ? "unknown"
+                  : activityIsComplete
+                  ? "complete"
+                  : "incomplete",
+            };
+          })
+        );
       };
 
-      // There is a promise for applying the filter her because would prefer that the
-      // activitiesAreLoading state be set immediately
-      new Promise<ReturnType<typeof applyActivitiesFilter>>((resolve) =>
-        resolve(applyActivitiesFilter(aarpData.activities, activitiesFilter))
-      )
-        .then((filteredActivityIdxs) => {
-          console.log(
-            "[index.tsx, getShownActivities] filter has been applied:",
-            filteredActivityIdxs
-          );
-          getActivityStatuses({
-            activityIds: filteredActivityIdxs.map(
-              (idx) => aarpData.activities[idx].identifier
-            ),
-            userFedId: aarpData.user.fedId,
-            accessToken: aarpData.user.accessToken,
-          })
-            .then((activityStatuses) => {
-              console.log(
-                "[index.tsx, getShownActivities] activity statuses have been fetched:",
-                activityStatuses
-              );
-              // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
-              setShownActivities(
-                filteredActivityIdxs.map((idx) => {
-                  const activityIsComplete =
-                    activityStatuses.activityFinishedStatuses[idx];
-                  return {
-                    activityIdx: idx,
-                    status:
-                      activityIsComplete === undefined
-                        ? "unknown"
-                        : activityIsComplete
-                        ? "complete"
-                        : "incomplete",
-                  };
-                })
-              );
-              setActivitiesAreLoading(false);
-            })
-            .catch(getShownActivitiesFailed);
+      populateShownActivities()
+        .catch((reason) => {
+          setShownActivities([]);
+          setActivitiesAreLoading(false);
+          console.error("Failed to populate shown activities:", reason);
         })
-        .catch(getShownActivitiesFailed);
+        .finally(() => setActivitiesAreLoading(false));
     }
   }, [aarpData.activities, activitiesFilter]);
 
@@ -188,7 +186,6 @@ function AARP() {
         const activity = aarpData.activities[activityIdx];
         const rewards = await earnActivityRewards({
           activity: { ...activity, type: activity.activityType.identifier },
-          openActivityUrl: false,
           user: { ...aarpData.user },
         });
         if (rewards && rewards.success)

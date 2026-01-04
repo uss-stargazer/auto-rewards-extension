@@ -114,14 +114,13 @@ export const [getActivityStatuses, onActivityStatusesRequest] = createMessage<
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   {
     activity: { identifier: string; type: string; url: string };
-    openActivityUrl: boolean;
     user: { fedId: string; accessToken: string };
   },
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");
 
 // The following is still a service worker message but
-// is more a background mechanism, not an AARP functions
+// is more a background mechanism, not an AARP function
 
 export const [alertPossibleUserChange, onPossibleUserChangeAlert] =
   createMessage<void, void>("possibleUserChangeAlert");
