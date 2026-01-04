@@ -77,7 +77,6 @@ function Activity({
               user: { ...aarpData.user },
             }).then((rewardsResponse) => {
               // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
-
               updateAarpTab({ url: activity.url });
             })
           }
