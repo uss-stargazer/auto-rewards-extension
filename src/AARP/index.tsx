@@ -153,6 +153,9 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivity[]>([]);
 
+  // Listen for potential user changes from service worker (via a port)
+  const [port, setPort] = useState<chrome.runtime.Port | null>(null);
+
   console.log("[index.tsx] AARP data reloaded:", {
     isLoading,
     user,
@@ -166,29 +169,33 @@ function AARPDataProvider({ children }: PropsWithChildren) {
       .then((newUser) => setUser(newUser))
       .finally(() => setIsLoading(false));
 
-    // Listen for potential user changes from service worker (via a port)
-    const userUpdateListener = (newUser: AarpUser | null) => {
-      console.log("[index.tsx] got user update", newUser);
-      if (!simpleDeepCompare(user, newUser)) {
-        console.log("[index.tsx] updated user has changed so setting user");
-        setUser(newUser);
-      } else {
-        console.log(
-          "[index.tsx] updated user has not changed. user:",
-          user,
-          " |  updated user:",
-          newUser
-        );
-      }
-    };
-    const port = chrome.runtime.connect({ name: "sidepanel-port" });
-    port.onMessage.addListener(userUpdateListener);
+    const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
+    setPort(sidepanelPort);
 
-    return () => {
-      port.onMessage.removeListener(userUpdateListener);
-      port.disconnect();
-    };
+    return sidepanelPort.disconnect;
   }, []);
+
+  // Update port message listener has seperate effect because it relies on user state
+  useEffect(() => {
+    if (port) {
+      const userUpdateListener = (newUser: AarpUser | null) => {
+        console.log("[index.tsx] got user update", newUser);
+        if (!simpleDeepCompare(user, newUser)) {
+          console.log("[index.tsx] updated user has changed so setting user");
+          setUser(newUser);
+        } else {
+          console.log(
+            "[index.tsx] updated user has not changed. user:",
+            user,
+            " |  updated user:",
+            newUser
+          );
+        }
+      };
+      port.onMessage.addListener(userUpdateListener);
+      return () => port.onMessage.removeListener(userUpdateListener);
+    }
+  }, [port, user]);
 
   useEffect(() => {
     if (fullyLoggedIn) {
