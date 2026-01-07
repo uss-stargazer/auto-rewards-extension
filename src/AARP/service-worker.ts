@@ -205,8 +205,8 @@ async function getActivityStatuses(
     activityFinishedStatuses.push(
       ...activityStatusesResponse.activityList.map((statusResponse) =>
         statusResponse.Error === null && statusResponse.Input === null
-          ? undefined
-          : statusResponse.limitHit
+          ? statusResponse.limitHit
+          : undefined
       )
     );
     userDailyPointsLeft = activityStatusesResponse.userDailyPointsLeft;

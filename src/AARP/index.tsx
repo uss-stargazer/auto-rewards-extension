@@ -106,13 +106,15 @@ function AARP() {
       </div>
     );
 
-  const [activitiesFilter, setActivitiesFilter] = //
-    useState<ActivitiesFilter>({});
   const [activitiesAreLoading, setActivitiesAreLoading] =
     useState<boolean>(true);
-  const [filteredActivities, setFilteredActivities] = useState<
-    { activityIdx: number; status: ActivityStatus }[]
-  >([]);
+  const [activitiesFilter, setActivitiesFilter] = useState<ActivitiesFilter>(
+    {}
+  );
+  const [filteredActivities, setFilteredActivities] = useState<number[]>([]);
+  const [activityStatuses, setActivityStatuses] = useState<{
+    [key: number]: ActivityStatus;
+  }>({});
   const [nActivitiesShown, setNActivitiesShown] = useState<number>(
     ACTIVITIES_CHUNK_SIZE
   );
@@ -129,92 +131,84 @@ function AARP() {
 
   useEffect(() => {
     if (aarpData.activities.length > 0 && nActivitiesShown > 0) {
-      console.log(
-        "[index.tsx, getShownActivities] applying filter and fetching statuses"
-      );
-      if (!activitiesAreLoading) setActivitiesAreLoading(true);
+      console.log("[index.tsx, applyActivitiesFilter] applying filter");
+      setActivitiesAreLoading(true);
 
       // Async because I want the activitiesAreLoading to be applied
       new Promise<ReturnType<typeof applyActivitiesFilter>>((resolve) =>
         resolve(applyActivitiesFilter(aarpData.activities, activitiesFilter))
       ).then((newFilteredActivities) => {
         console.log(
-          "[index.tsx, getShownActivities] filter has been applied:",
+          "[index.tsx, applyActivitiesFilter] filter has been applied:",
           newFilteredActivities
         );
-        setFilteredActivities(
-          newFilteredActivities.map((activityIdx) => {
-            const status = filteredActivities.find(
-              ({ activityIdx: prevActivityIdx }) =>
-                prevActivityIdx === activityIdx
-            )?.status;
-            return {
-              activityIdx,
-              // If activities status has already been determined, reuse it
-              status: status === "complete" ? status : "unknown",
-            };
-          })
-        );
-        if (activitiesAreLoading) setActivitiesAreLoading(false);
+        setFilteredActivities(newFilteredActivities);
+        setActivitiesAreLoading(false);
       });
     }
   }, [activitiesFilter, aarpData.activities, aarpData.user]);
 
   useEffect(() => {
-    if (!activitiesAreLoading) setActivitiesAreLoading(true);
+    if (filteredActivities.length > 0 && nActivitiesShown > 0) {
+      console.log("[index.tsx, fetchShown activity statuses] start");
 
-    const activitiesToCheck = filteredActivities
-      .filter(({ status }) => status !== "complete")
-      .map(({ activityIdx }) => ({
-        idx: activityIdx,
-        id: aarpData.activities[activityIdx].identifier,
-      }));
+      const activitiesToCheck = filteredActivities
+        .slice(0, nActivitiesShown) // Don't worry about those not shown
+        .filter((activityIdx) => activityStatuses[activityIdx] !== "complete")
+        .map((activityIdx) => ({
+          idx: activityIdx,
+          id: aarpData.activities[activityIdx].identifier,
+        }));
 
-    getActivityStatuses({
-      activityIds: activitiesToCheck.map(({ id }) => id),
-      userFedId: aarpData.user.fedId,
-      accessToken: aarpData.user.accessToken,
-    })
-      .then(({ activityFinishedStatuses, userDailyPointsLeft }) => {
-        // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
-        console.log(
-          "[index.tsx, getShownActivities] activity statuses have been fetched:",
-          activityFinishedStatuses,
-          userDailyPointsLeft
-        );
-        setFilteredActivities(
-          filteredActivities.map((filteredActivity) => {
-            const checkIdx = activitiesToCheck.findIndex(
-              ({ idx: testIdx }) => testIdx === filteredActivity.activityIdx
+      console.log(
+        "[index.tsx, fetchShown activity statuses] activities to check:",
+        activitiesToCheck
+      );
+
+      if (activitiesToCheck.length > 0) {
+        getActivityStatuses({
+          activityIds: activitiesToCheck.map(({ id }) => id),
+          userFedId: aarpData.user.fedId,
+          accessToken: aarpData.user.accessToken,
+        })
+          .then(({ activityFinishedStatuses, userDailyPointsLeft }) => {
+            // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
+            console.log(
+              "[index.tsx, fetchShown activity statuses] activity statuses have been fetched:",
+              activityFinishedStatuses,
+              "; daily points:",
+              userDailyPointsLeft
             );
-            if (checkIdx >= 0) {
-              const isComplete = activityFinishedStatuses[checkIdx];
-              return {
-                activityIdx: filteredActivity.activityIdx,
-                status:
+            const newActivityStatuses = activityFinishedStatuses.reduce(
+              (activityStatuses, isComplete, checkIdx) => {
+                activityStatuses[activitiesToCheck[checkIdx].idx] =
                   isComplete === undefined
                     ? "unknown"
                     : isComplete
                     ? "complete"
-                    : "incomplete",
-              };
-            }
-            return filteredActivity;
+                    : "incomplete";
+                return activityStatuses;
+              },
+              { ...activityStatuses }
+            );
+            console.log(
+              "[index.tsx, fetchShown activity statuses] new activity statuses:",
+              newActivityStatuses
+            );
+            setActivityStatuses(newActivityStatuses);
           })
-        );
-      })
-      .catch((reason) => {
-        console.error(
-          "Failed to fetch statuses for activities:",
-          reason,
-          "(activities:",
-          filteredActivities,
-          ")"
-        );
-        setFilteredActivities([]);
-        setActivitiesAreLoading(false);
-      })
-      .finally(() => setActivitiesAreLoading(false));
+          .catch((reason) => {
+            console.error(
+              "Failed to fetch statuses for activities:",
+              reason,
+              "(activities:",
+              activitiesToCheck,
+              ")"
+            );
+            setActivityStatuses([]);
+          });
+      }
+    }
   }, [filteredActivities, nActivitiesShown]);
 
   const earnMaxDailyRewards = async () => {
@@ -249,13 +243,15 @@ function AARP() {
             <a onClick={earnMaxDailyRewards}>Earn max daily rewards</a>
             <div>
               {nActivitiesShown > 0 ? (
-                filteredActivities.map(({ activityIdx, status }) => (
-                  <Activity
-                    key={activityIdx}
-                    activityIdx={activityIdx}
-                    status={status}
-                  />
-                ))
+                filteredActivities
+                  .slice(0, nActivitiesShown)
+                  .map((activityIdx) => (
+                    <Activity
+                      key={activityIdx}
+                      activityIdx={activityIdx}
+                      status={activityStatuses[activityIdx] ?? "unknown"}
+                    />
+                  ))
               ) : (
                 <p>Showing 0 activities</p>
               )}
