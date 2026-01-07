@@ -226,13 +226,34 @@ async function earnActivityRewards(
   )
     return null;
 
-  return await queryAarpApi(
+  const rewardsResponse = await queryAarpApi(
     ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
     {},
     user.accessToken,
     activity.url,
     RewardsResponseSchema
   );
+
+  // Write aarp_rewards_balance manually (cookie listener below already
+  // listens for this so no need to manually send balance update)
+  const previousBalance = await chrome.cookies.get({
+    url: ORIGIN,
+    name: "aarp_rewards_balance",
+  });
+  const newBalance =
+    (previousBalance ? Number(previousBalance.value) : 0) +
+    rewardsResponse.pointsEarned;
+  await chrome.cookies.set({
+    url: ORIGIN,
+    name: "aarp_rewards_balance",
+    value: newBalance.toString(),
+  });
+  console.log(
+    "[service worker] aarp_rewards_balance cookie set to:",
+    newBalance.toString()
+  );
+
+  return rewardsResponse;
 }
 
 // Register functional message listeners ----------------------------------------------------------
