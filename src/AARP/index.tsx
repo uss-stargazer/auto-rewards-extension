@@ -28,6 +28,7 @@ type AARPData =
   | {
       status: "loggedIn" | "mustConfirmPassword";
       user: AarpUser;
+      balance: { rewardsBalance?: number; dailyRewardsAvailable?: number };
       activities: AarpActivity[];
     }
   | { status: "notLoggedIn" };
@@ -157,7 +158,7 @@ function AARP() {
   }, [activitiesFilter, aarpData.activities, aarpData.user]);
 
   // Hook for updating status of shown activities defined as a function so buttons can refresh activity statuses
-  const updateActivityStatuses = async () => {
+  const updateActivityStatuses = () => {
     console.log("[index.tsx, fetchShown activity statuses] start");
 
     const activitiesToCheck = filteredActivities
@@ -230,7 +231,7 @@ function AARP() {
   const earnMaxDailyRewards = async () => {
     if (aarpData.activities) {
       let dailyRewardsLeft =
-        aarpData.user.dailyRewardsAvailable ?? MAX_DAILY_REWARDS;
+        aarpData.balance.dailyRewardsAvailable ?? MAX_DAILY_REWARDS;
       let activityIdx = 0;
       while (aarpData.activities[activityIdx] && dailyRewardsLeft > 0) {
         const activity = aarpData.activities[activityIdx];
@@ -249,7 +250,7 @@ function AARP() {
     <div>
       <div>
         <h2>Hello {aarpData.user.username}!</h2>
-        <h3>Rewards balance: {aarpData.user.rewardsBalance ?? "unknown"}</h3>
+        <h3>Rewards balance: {aarpData.balance.rewardsBalance ?? "unknown"}</h3>
       </div>
       <div>
         {activitiesAreLoading ? (
@@ -304,6 +305,10 @@ function AARP() {
 function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
+  const [balance, setBalance] = useState<{
+    rewardsBalance?: number;
+    dailyRewardsAvailable?: number;
+  }>({});
   const [activities, setActivities] = useState<AarpActivity[]>([]);
 
   // Listen for potential user changes from service worker (via a port)
@@ -319,19 +324,27 @@ function AARPDataProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     getUser()
-      .then((newUser) => setUser(newUser))
+      .then(({ user: newUser, rewardsBalance }) => {
+        setUser(newUser);
+        setBalance({ ...balance, rewardsBalance });
+      })
       .finally(() => setIsLoading(false));
 
     const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
     setPort(sidepanelPort);
-
     return sidepanelPort.disconnect;
   }, []);
 
   // Update port message listener has seperate effect because it relies on user state
   useEffect(() => {
     if (port) {
-      const userUpdateListener = (newUser: AarpUser | null) => {
+      const userUpdateListener = ({
+        user: newUser,
+        rewardsBalance,
+      }: {
+        user: AarpUser | null;
+        rewardsBalance?: number;
+      }) => {
         console.log("[index.tsx] got user update", newUser);
         if (!simpleDeepCompare(user, newUser)) {
           console.log("[index.tsx] updated user has changed so setting user");
@@ -344,6 +357,7 @@ function AARPDataProvider({ children }: PropsWithChildren) {
             newUser
           );
         }
+        setBalance({ ...balance, rewardsBalance });
       };
       port.onMessage.addListener(userUpdateListener);
       return () => port.onMessage.removeListener(userUpdateListener);
@@ -373,8 +387,9 @@ function AARPDataProvider({ children }: PropsWithChildren) {
         status: user.userMustConfirmPassword
           ? "mustConfirmPassword"
           : "loggedIn",
-        activities: activities,
-        user: user,
+        user,
+        balance,
+        activities,
       }
     : { status: "notLoggedIn" };
 

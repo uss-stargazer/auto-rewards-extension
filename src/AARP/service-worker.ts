@@ -78,7 +78,10 @@ async function updateAarpTab(
   return aarpTab.id!;
 }
 
-async function getUser(): Promise<AarpUser | null> {
+async function getUser(): Promise<{
+  user: AarpUser | null;
+  rewardsBalance?: number;
+}> {
   console.log("[background, getUser] getting user object");
   const aarpTab = await getAarpTab();
   const cookies = await USER_COOKIES.reduce<
@@ -105,17 +108,19 @@ async function getUser(): Promise<AarpUser | null> {
         username: cookies["games"] ?? "unknown",
         fedId: cookies["fedid"],
         accessToken: accessToken,
-        rewardsBalance:
-          (cookies["aarp_rewards_balance"] &&
-            Number(cookies["aarp_rewards_balance"])) ||
-          undefined,
         userMustConfirmPassword:
           !cookies["AARP_SSO_AUTH_EX"] || !cookies["AARP_SSO_AUTH2"],
       }) ||
     null;
 
   console.log("[background, getUser] got user:", user);
-  return user;
+  return {
+    user,
+    rewardsBalance:
+      (cookies["aarp_rewards_balance"] &&
+        Number(cookies["aarp_rewards_balance"])) ||
+      undefined,
+  };
 }
 
 async function getActivities(

@@ -19,8 +19,6 @@ export interface AarpUser {
   username: string;
   fedId: string;
   accessToken: string;
-  rewardsBalance?: number;
-  dailyRewardsAvailable?: number;
   userMustConfirmPassword: boolean;
 }
 
@@ -93,9 +91,13 @@ export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
   number
 >("updateAarpTab");
 
-export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
-  "getAarpUser"
-);
+export const [getUser, onGetUserRequest] = createMessage<
+  void,
+  {
+    user: AarpUser | null;
+    rewardsBalance?: number;
+  }
+>("getAarpUser");
 
 export const [getActivities, onActivitiesRequest] = createMessage<
   { accessToken: string; maxNActivities: number },
