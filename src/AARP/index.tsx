@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   AarpActivity,
   AarpUser,
+  earnActivityRewards,
   getActivities,
   getUser,
 } from "./modules/definitions";
@@ -11,7 +12,27 @@ import { LOGIN_URL } from "./modules/tools";
 const MAX_ACTIVITIES = 25;
 
 function Activity({ activity }: { activity: AarpActivity }) {
-  return <div>Activity ({activity.identifier})</div>;
+  const [isComplete, setIsComplete] = useState<boolean>(false);
+
+  return (
+    <div>
+      <p>Activity ({activity.identifier})</p>
+      {isComplete ? (
+        <p>Completed</p>
+      ) : (
+        <a
+          onClick={() =>
+            earnActivityRewards({
+              activity: activity,
+              openActivityUrl: true,
+            }).then(() => setIsComplete(true))
+          }
+        >
+          Get rewards
+        </a>
+      )}
+    </div>
+  );
 }
 
 function AARP() {

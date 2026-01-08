@@ -5,7 +5,9 @@ import {
   getUser,
   NotLoggedInError,
   onActivitiesRequest,
+  onEarnRewardsRequest,
   onGetUserRequest,
+  RewardsResponseSchema,
 } from "./modules/definitions";
 import {
   isAarpTab,
@@ -17,6 +19,11 @@ import {
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
+const ACTIVITY_REWARDS_API_URL = (
+  userFedId: string,
+  activityId: string
+): string =>
+  `https://services.share.aarp.org/applications/loyalty-catalog/activity/usergroup/member/user/${userFedId}/${activityId}`;
 
 const SUPPORTED_ACTIVITY_TYPES = ["video"];
 
@@ -106,4 +113,38 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
   });
 
   return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
+});
+
+/**
+ * This is the main function for getting the activity rewards. Some AARP server somewhere
+ * gives rewards to an account when a single POST request is sent to it with the proper
+ * authentication, so we're just gonna send it so we don't have to do the activity.
+ */
+onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
+  const user = await getUser();
+  if (!user)
+    throw new NotLoggedInError(
+      "You must be signed into AARP to earn video rewards",
+      LOGIN_URL
+    );
+
+  if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
+    return sendResponse(null);
+  if (openActivityUrl) {
+    const aarpTab = await updateTabAndWaitForLoad((await getAarpTab()).id!, {
+      url: activity.url,
+      active: true,
+    });
+    if (!aarpTab) throw new Error("Error occurred updating AARP tab URL");
+  }
+
+  return sendResponse(
+    await queryAarpApi(
+      ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
+      {},
+      user.accessToken,
+      activity.url,
+      RewardsResponseSchema
+    )
+  );
 });

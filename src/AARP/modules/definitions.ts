@@ -44,6 +44,15 @@ const ActivitySchema = z.object({
 export type AarpActivity = z.infer<typeof ActivitySchema>;
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
+export const RewardsResponseSchema = z.object({
+  activityCompleted: z.uuid(),
+  pointsEarned: z.number(),
+  userDailyPointsLeft: z.number(),
+  awarded: z.boolean(),
+  success: z.boolean(),
+});
+export type AarpRewardsResponse = z.infer<typeof RewardsResponseSchema>;
+
 // Content script message definitions -------------------------------------------------------------
 
 export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
@@ -61,3 +70,8 @@ export const [getActivities, onActivitiesRequest] = createMessage<
   number,
   AarpActivity[]
 >("getAarpActivites");
+
+export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
+  { activity: AarpActivity; openActivityUrl: boolean },
+  AarpRewardsResponse | null
+>("earnAarpActivityRewards");
