@@ -28,11 +28,11 @@ const ACTIVITY_REWARDS_API_URL = (
 const SUPPORTED_ACTIVITY_TYPES = ["video"];
 
 async function getAarpTab(): Promise<chrome.tabs.Tab> {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await chrome.tabs.query({ currentWindow: true });
   const aarpTabs = tabs.filter((tab) => isAarpTab(tab.url));
   if (aarpTabs.length > 0) return aarpTabs[0];
   return new Promise((resolve) => {
-    chrome.tabs.create({ url: ORIGIN, active: true }, (newTab) => {
+    chrome.tabs.create({ url: ORIGIN }, (newTab) => {
       const listener = (
         tabId: number,
         changeInfo: chrome.tabs.OnUpdatedInfo,
@@ -114,7 +114,7 @@ async function getActivities(
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
   const aarpTab = await chrome.tabs.get(
-    await updateAarpTab({ url: REWARDS_URL, active: true })
+    await updateAarpTab({ url: REWARDS_URL })
   );
 
   const activitiesList = await queryAarpApi(
@@ -165,7 +165,7 @@ async function earnActivityRewards(
   user: { fedId: string; accessToken: string }
 ): Promise<AarpRewardsResponse | null> {
   if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.type)) return null;
-  if (openActivityUrl) await updateAarpTab({ url: activity.url, active: true });
+  if (openActivityUrl) await updateAarpTab({ url: activity.url });
 
   return await queryAarpApi(
     ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
