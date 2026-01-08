@@ -14,7 +14,7 @@ export class NotLoggedInError extends Error {
   }
 }
 
-// Types and schemas -------------------
+// Types and schemas ------------------------------------------------------------------------------
 
 export interface AarpUser {
   username: string;
@@ -22,6 +22,7 @@ export interface AarpUser {
   accessToken: string;
   rewardsBalance?: number;
   dailyPointsLeft?: number;
+  mustConfirmPassword: boolean;
 }
 
 // TODO: look here for styling and cool options (like searching for topics, for example)
