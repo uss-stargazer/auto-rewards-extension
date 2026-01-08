@@ -2,16 +2,20 @@ import React, {
   createContext,
   PropsWithChildren,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import {
   AarpActivityWithStatus,
   AarpUser,
   earnActivityRewards,
+  getActivities,
+  getUser,
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
-import { LOGIN_URL } from "./modules/tools";
+import { isAarpTab, LOGIN_URL } from "./modules/tools";
+import { simpleDeepCompare } from "../modules/utils";
 
 type AARPData =
   | {
@@ -53,13 +57,9 @@ function Activity({ activityIdx }: { activityIdx: number }) {
         <a
           onClick={() =>
             earnActivityRewards({
-              activity: {
-                identifier: activity.identifier,
-                url: activity.url,
-                type: activity.activityType.identifier,
-              },
+              activity: { ...activity, type: activity.activityType.identifier },
               openActivityUrl: true,
-              user: aarpData.user,
+              user: { ...aarpData.user },
             })
           }
         >
@@ -119,6 +119,58 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivityWithStatus[]>([]);
+
+  const fullyLoggedIn = !isLoading && user && !user.mustConfirmPassword;
+
+  useEffect(() => {
+    // If a tab goes to an AARP url, we need to check to see if the user has changed and if the
+    const updateUserListener = (
+      _: any,
+      update: chrome.tabs.UpdateProperties,
+      tab: chrome.tabs.Tab
+    ) => {
+      if (
+        tab.active &&
+        update.url &&
+        tab.status === "complete" &&
+        isAarpTab(tab.url)
+      ) {
+        if (!isLoading) setIsLoading(true);
+        getUser()
+          .then((newUser) => {
+            if (!simpleDeepCompare(user, newUser)) setUser(newUser);
+          })
+          .finally(() => setIsLoading(false));
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(updateUserListener);
+
+    // Trigger listener to get initial user and activiites
+    updateAarpTab({ active: true });
+
+    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
+  }, []);
+
+  useEffect(() => {
+    if (fullyLoggedIn) {
+      getActivities({
+        maxNActivities: MAX_ACTIVITIES,
+        accessToken: user.accessToken,
+      })
+        .then((aarpActivities) => {
+          setActivities(
+            aarpActivities.map((activity) => ({
+              ...activity,
+              isCompleted: false,
+            }))
+          );
+        })
+        .catch(() => setActivities([]));
+    } else {
+      setActivities([]);
+    }
+  }, [user]);
 
   const aarpData: AARPData | "loading" = isLoading
     ? "loading"
