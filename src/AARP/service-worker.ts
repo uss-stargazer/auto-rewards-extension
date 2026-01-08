@@ -70,7 +70,13 @@ async function updateAarpTab(
 
 async function getUser(): Promise<AarpUser | null> {
   const aarpTab = await getAarpTab();
-  const cookies = await ["games", "fedid", "aarp_rewards_balance"].reduce<
+  const cookies = await [
+    "games",
+    "fedid",
+    "aarp_rewards_balance",
+    "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
+    "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
+  ].reduce<
     Promise<{
       [key: string]: string | null;
     }>
@@ -80,7 +86,10 @@ async function getUser(): Promise<AarpUser | null> {
     cookiesObj[cookieName] = cookie && cookie.value;
     return cookiesObj;
   }, Promise.resolve({}));
-  const accessToken = await getTabLocalStorage("access_token", aarpTab.id!);
+
+  const accessToken =
+    (await getTabLocalStorage("access_token", aarpTab.id!)) ??
+    (await getTabLocalStorage("acctAccessToken", aarpTab.id!));
   const dailyPointsLeft = await getTabLocalStorage(
     "user_daily_points_left",
     aarpTab.id!
@@ -97,6 +106,8 @@ async function getUser(): Promise<AarpUser | null> {
             Number(cookies["aarp_rewards_balance"])) ||
           undefined,
         dailyPointsLeft: dailyPointsLeft ? Number(dailyPointsLeft) : undefined,
+        mustConfirmPassword:
+          !cookies["AARP_SSO_AUTH_EX"] || !cookies["AARP_SSO_AUTH2"],
       }) ||
     null;
 
