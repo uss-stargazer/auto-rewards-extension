@@ -1,9 +1,12 @@
 import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
+  AarpActivity,
+  AarpActivityStatusResponse,
+  AarpRewardsResponse,
+  AarpUser,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
-  getUser,
   NotLoggedInError,
   onActivitiesRequest,
   onActivityStatusRequest,
@@ -11,7 +14,6 @@ import {
   onGetUserRequest,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
-  updateAarpTab,
 } from "./modules/definitions";
 import {
   isAarpTab,
@@ -53,7 +55,9 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
-onUpdateAarpTabRequest(async (sendResponse, update) => {
+async function updateAarpTab(
+  update: chrome.tabs.UpdateProperties
+): Promise<number> {
   const aarpTab = await updateTabAndWaitForLoad(
     (
       await getAarpTab()
@@ -61,10 +65,10 @@ onUpdateAarpTabRequest(async (sendResponse, update) => {
     update
   );
   if (!aarpTab) throw new Error("Error occurred updating AARP tab");
-  return sendResponse(aarpTab.id!);
-});
+  return aarpTab.id!;
+}
 
-onGetUserRequest(async (sendResponse) => {
+async function getUser(): Promise<AarpUser | null> {
   const aarpTab = await getAarpTab();
   const cookies = await ["games", "fedid", "aarp_rewards_balance"].reduce<
     Promise<{
@@ -82,11 +86,10 @@ onGetUserRequest(async (sendResponse) => {
     aarpTab.id!
   );
 
-  return sendResponse(
-    (cookies["games"] &&
-      cookies["fedid"] &&
+  const user =
+    (cookies["fedid"] &&
       accessToken && {
-        username: cookies["games"],
+        username: cookies["games"] ?? "unknown",
         fedId: cookies["fedid"],
         accessToken: accessToken,
         rewardsBalance:
@@ -95,11 +98,12 @@ onGetUserRequest(async (sendResponse) => {
           undefined,
         dailyPointsLeft: dailyPointsLeft ? Number(dailyPointsLeft) : undefined,
       }) ||
-      null
-  );
-});
+    null;
 
-onActivitiesRequest(async (sendResponse, maxNActivities) => {
+  return user;
+}
+
+async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(
@@ -138,10 +142,12 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
     return false;
   });
 
-  return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
-});
+  return filteredActivitiesList.slice(0, maxNActivities);
+}
 
-onActivityStatusRequest(async (sendResponse) => {
+async function getActivityStatus(
+  activityId: string
+): Promise<AarpActivityStatusResponse> {
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(
@@ -149,23 +155,19 @@ onActivityStatusRequest(async (sendResponse) => {
       LOGIN_URL
     );
 
-  return sendResponse(
-    await queryAarpApi(
-      ACTIVITY_STATUS_API_URL,
-      undefined,
-      user.accessToken,
-      REWARDS_URL,
-      ActivityStatusResponseSchema
-    )
+  return await queryAarpApi(
+    ACTIVITY_STATUS_API_URL,
+    undefined,
+    user.accessToken,
+    REWARDS_URL,
+    ActivityStatusResponseSchema
   );
-});
+}
 
-/**
- * This is the main function for getting the activity rewards. Some AARP server somewhere
- * gives rewards to an account when a single POST request is sent to it with the proper
- * authentication, so we're just gonna send it so we don't have to do the activity.
- */
-onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
+async function earnActivityRewards(
+  activity: AarpActivity,
+  openActivityUrl: boolean
+): Promise<AarpRewardsResponse | null> {
   const user = await getUser();
   if (!user)
     throw new NotLoggedInError(
@@ -174,16 +176,34 @@ onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
     );
 
   if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
-    return sendResponse(null);
+    return null;
   if (openActivityUrl) await updateAarpTab({ url: activity.url, active: true });
 
-  return sendResponse(
-    await queryAarpApi(
-      ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
-      {},
-      user.accessToken,
-      activity.url,
-      RewardsResponseSchema
-    )
+  return await queryAarpApi(
+    ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
+    {},
+    user.accessToken,
+    activity.url,
+    RewardsResponseSchema
   );
-});
+}
+
+// Register message listeners -----------------------------------------------
+
+onUpdateAarpTabRequest(async (sendResponse, update) =>
+  sendResponse(await updateAarpTab(update))
+);
+
+onGetUserRequest(async (sendResponse) => sendResponse(await getUser()));
+
+onActivitiesRequest(async (sendResponse, maxNActivities) =>
+  sendResponse(await getActivities(maxNActivities))
+);
+
+onActivityStatusRequest(async (sendResponse, activityId) =>
+  sendResponse(await getActivityStatus(activityId))
+);
+
+onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) =>
+  sendResponse(await earnActivityRewards(activity, openActivityUrl))
+);
