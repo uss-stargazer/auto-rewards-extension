@@ -65,6 +65,11 @@ export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
 
 // Service worker message definitions -------------------------------------------------------------
 
+export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
+  chrome.tabs.UpdateProperties,
+  number
+>("updateAarpTab");
+
 export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
   "getAarpUser"
 );
