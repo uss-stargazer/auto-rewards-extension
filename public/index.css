@@ -1,0 +1,114 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-color: #f8fafc;
+  --text-color: #1e293b;
+  --header-bg: #e2e8f0;
+  --btn-bg: #3b82f6;
+  --btn-text: #ffffff;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background 0.3s, color 0.3s;
+}
+
+#root,
+.page-layout {
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem;
+  gap: 1rem;
+}
+
+/* Button */
+
+.btn {
+  padding: 10px 20px;
+  font-size: 1em;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 0.3s, color 0.3s;
+}
+
+.btn:hover {
+  background: var(--btn-text);
+  color: var(--btn-bg);
+}
+
+/* Bar */
+
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1em;
+}
+
+/* Icon */
+
+.small-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.medium-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.large-icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+.button-icon {
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 1em;
+  padding: auto;
+  background: var(--btn-text);
+  color: var(--btn-bg);
+  transition: background 0.3s, color 0.3s;
+}
+
+.button-icon:hover {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+/* List */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+/* Dropdown */
+
+.arrow-down {
+  transform: rotate(0deg);
+  transition: transform 0.3s ease;
+}
+
+.arrow-right {
+  transform: rotate(-90deg);
+  transition: transform 0.3s ease;
+}
+
+/* Platforms list */
+
+.platform-header {
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  background-color: var(--header-bg);
+}

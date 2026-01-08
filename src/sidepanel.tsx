@@ -1,21 +1,48 @@
-import React from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { openExtensionOptions } from "./modules/definitions";
+import { MdKeyboardArrowDown, MdOutlineSettings } from "react-icons/md";
 
 const platforms: { name: string; element: React.ReactElement }[] = [];
 
 function Sidepanel() {
+  const [activePlatformIdx, setActivePlatformIdx] = useState<number>(-1);
+
   return (
-    <div>
-      <h1>Sidepanel</h1>
-      <div id="platforms">
-        {platforms.map((platform, idx) => (
-          <div key={idx}>
-            <p>{platform.name}</p>
-            <div>{platform.element}</div>
-          </div>
-        ))}
+    <>
+      <div className="bar">
+        <h1>AutoRewards</h1>
+        <div className="button-icon" onClick={() => openExtensionOptions()}>
+          <MdOutlineSettings className="large-icon" />
+        </div>
       </div>
-    </div>
+
+      <div className="list">
+        {platforms.map((platform, idx) => {
+          const isOpen = idx === activePlatformIdx;
+          return (
+            <div key={platform.name}>
+              <div
+                className="bar dropdown-header"
+                onClick={() =>
+                  setActivePlatformIdx(activePlatformIdx === idx ? -1 : idx)
+                }
+              >
+                <h2>{platform.name}</h2>
+                <MdKeyboardArrowDown
+                  className={`medium-icon ${
+                    isOpen ? "dropdown-arrow-down" : "dropdown-arrow-right"
+                  }`}
+                />
+              </div>
+              {isOpen && (
+                <div className="dropdown-content">{platform.element}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
