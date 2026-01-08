@@ -5,7 +5,9 @@ import setTheme from "./modules/setTheme";
 import { openExtensionOptions } from "./modules/definitions";
 import { MdKeyboardArrowDown, MdOutlineSettings } from "react-icons/md";
 
-const platforms: { name: string; element: React.ReactElement }[] = [];
+import AARP from "./AARP";
+
+const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
   const { options } = useOptions();
