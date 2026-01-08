@@ -43,10 +43,23 @@ export type AarpActivityWithStatus = z.infer<typeof ActivitySchema> & {
 };
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
-export const ActivityStatusResponseSchema = z.object({});
-export type AarpActivityStatusResponse = z.infer<
-  typeof ActivityStatusResponseSchema
->;
+export const ActivityStatusResponseSchema = z.object({
+  activityList: z.array(
+    z.object({
+      activityIdentifier: z.uuid(),
+      limitHit: z.boolean(),
+      Error: z.nullable(z.any()),
+      Input: z.nullable(z.any()),
+    })
+  ),
+  userDailyPointsLeft: z.number(),
+  exceptionCount: z.number(),
+  success: z.boolean(),
+});
+export type AarpActivityStatuses = {
+  activityFinishedStatuses: (boolean | undefined)[]; // A undefined value usually signifies error
+  userDailyPointsLeft: number | undefined;
+};
 
 export const RewardsResponseSchema = z.object({
   activityCompleted: z.uuid(),
@@ -80,10 +93,14 @@ export const [getActivities, onActivitiesRequest] = createMessage<
   AarpActivity[]
 >("getAarpActivites");
 
-export const [getActivityStatus, onActivityStatusRequest] = createMessage<
-  { activityId: string; accessToken: string },
-  AarpActivityStatusResponse
->("getAarpActivityStatus");
+export const [getActivityStatuses, onActivityStatusesRequest] = createMessage<
+  {
+    activityIds: string[];
+    userFedId: string;
+    accessToken: string;
+  },
+  AarpActivityStatuses
+>("getAarpActivityStatuses");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   {
