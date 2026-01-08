@@ -13,11 +13,17 @@
   },
   "options": "options.tsx",
   "sidepanel": "sidepanel.tsx",
-  "background": ["service-worker.ts"],
+  "background": ["service-worker.ts", "AARP/service-worker.ts"],
   "contentScripts": [
     {
       "urlMatches": ["<all_urls>"],
       "scripts": [{ "name": "contentScript", "path": "content-script.ts" }]
+    },
+    {
+      "urlMatches": ["https://*.aarp.org/**"],
+      "scripts": [
+        { "name": "aarpContentScript", "path": "AARP/content-script.ts" }
+      ]
     }
   ]
 }

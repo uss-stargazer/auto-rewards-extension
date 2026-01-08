@@ -1,7 +1,9 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-const platforms: { name: string; element: React.ReactElement }[] = [];
+import AARP from "./AARP";
+
+const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
   return (
