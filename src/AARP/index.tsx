@@ -10,7 +10,9 @@ import {
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
 
-const MAX_ACTIVITIES = 25;
+const MAX_DAILY_REWARDS = 5000;
+const ACTIVITIES_CHUNK_SIZE = 5;
+const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
 
 function Activity({ activity }: { activity: AarpActivity }) {
   const [isComplete, setIsComplete] = useState<boolean>(false);
@@ -40,6 +42,9 @@ function AARP() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivity[]>([]);
+  const [nActivitiesDisplayed, setNActivitiesDisplayed] = useState<number>(
+    ACTIVITIES_CHUNK_SIZE
+  );
 
   const updateUser = () => getUser().then((user) => setUser(user));
   useEffect(() => {
@@ -75,9 +80,15 @@ function AARP() {
       </div>
       <div>
         {activities.length > 0 ? (
-          activities.map((activity, idx) => (
-            <Activity key={idx} activity={activity} />
-          ))
+          <>
+            <div>
+              {activities
+                .slice(0, nActivitiesDisplayed)
+                .map((activity, idx) => (
+                  <Activity key={idx} activity={activity} />
+                ))}
+            </div>
+          </>
         ) : (
           <p>No activities found.</p>
         )}
