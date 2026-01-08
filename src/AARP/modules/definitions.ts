@@ -45,6 +45,9 @@ const ActivitySchema = z.object({
   membersOnly: z.boolean(),
 });
 export type AarpActivity = z.infer<typeof ActivitySchema>;
+export type AarpActivityWithStatus = z.infer<typeof ActivitySchema> & {
+  isCompleted: boolean;
+};
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
 export const ActivityStatusResponseSchema = z.object({});
