@@ -13,6 +13,8 @@ import {
   onGetUserRequest,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
+  SUPPORTED_ACTIVITY_TYPES,
+  SupportedActivityType,
 } from "./modules/definitions";
 import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
 
@@ -24,8 +26,6 @@ const ACTIVITY_REWARDS_API_URL = (
   activityId: string
 ): string =>
   `https://services.share.aarp.org/applications/loyalty-catalog/activity/usergroup/member/user/${userFedId}/${activityId}`;
-
-const SUPPORTED_ACTIVITY_TYPES = ["video"];
 
 async function getAarpTab(): Promise<chrome.tabs.Tab> {
   const tabs = await chrome.tabs.query({ currentWindow: true });
@@ -132,7 +132,9 @@ async function getActivities(
     if (
       activity.active &&
       (activity.deleted === null || !activity.deleted) &&
-      SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier)
+      SUPPORTED_ACTIVITY_TYPES.includes(
+        activity.activityType.identifier as SupportedActivityType
+      )
     ) {
       const dateRange = [
         new Date(activity.startDate),
@@ -164,7 +166,11 @@ async function earnActivityRewards(
   openActivityUrl: boolean,
   user: { fedId: string; accessToken: string }
 ): Promise<AarpRewardsResponse | null> {
-  if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.type)) return null;
+  if (
+    !SUPPORTED_ACTIVITY_TYPES.includes(activity.type as SupportedActivityType)
+  )
+    return null;
+
   if (openActivityUrl) await updateAarpTab({ url: activity.url });
 
   return await queryAarpApi(
