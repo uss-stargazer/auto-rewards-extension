@@ -26,6 +26,14 @@ export function parseStatesObject<
   return props;
 }
 
+/**
+ * Converts both parameters to strings and compares those.
+ * Don't use if the items contain more complex things like functions or DOM nodes.
+ */
+export function simpleDeepCompare(a: any, b: any): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export async function updateTabAndWaitForLoad(
   tabId: number,
   update: chrome.tabs.UpdateProperties,
