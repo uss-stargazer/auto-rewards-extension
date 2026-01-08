@@ -133,7 +133,8 @@ async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
     undefined,
     user.accessToken,
     aarpTab.url!,
-    ActivitiesListSchema
+    ActivitiesListSchema,
+    "GET"
   );
 
   // We need to filter out outdated/inactive activities as well as activites we can't automate
