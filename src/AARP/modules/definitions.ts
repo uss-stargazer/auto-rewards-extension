@@ -17,6 +17,8 @@ export interface AarpUser {
   username: string;
   fedId: string;
   accessToken: string;
+  rewardsBalance?: number;
+  dailyPointsLeft?: number;
 }
 
 // TODO: look here for styling and cool options (like searching for topics, for example)
