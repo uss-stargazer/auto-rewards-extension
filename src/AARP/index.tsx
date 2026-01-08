@@ -1,49 +1,61 @@
-import React, { useEffect, useState } from "react";
+import React, {
+  createContext,
+  PropsWithChildren,
+  useContext,
+  useState,
+} from "react";
 import {
-  AarpActivity,
+  AarpActivityWithStatus,
   AarpUser,
   earnActivityRewards,
-  getActivities,
-  getActivityStatus,
-  getUser,
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
 
+type AARPData =
+  | {
+      status: "loggedIn" | "mustConfirmPassword";
+      user: AarpUser;
+      activities: AarpActivityWithStatus[];
+    }
+  | { status: "notLoggedIn" };
+
 const MAX_DAILY_REWARDS = 5000;
 const ACTIVITIES_CHUNK_SIZE = 5;
-const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
+const MAX_ACTIVITIES = 4000; // Should never really get beyond this, but just a cut off in that case
 
-function Activity({ activity }: { activity: AarpActivity }) {
-  const [isComplete, setIsComplete] = useState<boolean>();
+const AARPDataContext = createContext<AARPData | "loading">("loading");
 
-  useEffect(() => {
-    if (!isComplete) {
-      getActivityStatus(activity.identifier).then((status) =>
-        setIsComplete(status.completed)
-      );
-    }
-  }, [isComplete]);
+function Activity({ activityIdx }: { activityIdx: number }) {
+  const aarpData = useContext(AARPDataContext);
+
+  if (aarpData === "loading" || aarpData.status !== "loggedIn")
+    throw new Error(
+      "To create <Activity/>, AARP must have finished loading and must be logged into"
+    );
+
+  const activity = aarpData.activities[activityIdx];
+  if (!activity) throw RangeError("<Activity/> activityIdx out of bounds");
 
   return (
     <div>
       <div>
         <h4>{activity.name}</h4>
-        {isComplete ? (
+        {activity.isCompleted ? (
           <p>Completed</p>
         ) : (
           <p>{activity.activityType.basePointValue}</p>
         )}
       </div>
       <p>{activity.description}</p>
-      {isComplete || (
+      {activity.isCompleted || (
         <a
           onClick={() =>
             earnActivityRewards({
               activity: activity,
               openActivityUrl: true,
-            }).then(() => setIsComplete(true))
+            })
           }
         >
           Get rewards
@@ -54,53 +66,39 @@ function Activity({ activity }: { activity: AarpActivity }) {
 }
 
 function AARP() {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<AarpUser | null>(null);
-  const [activities, setActivities] = useState<AarpActivity[]>([]);
+  const aarpData = useContext(AARPDataContext);
   const [nActivitiesDisplayed, setNActivitiesDisplayed] = useState<number>(
     ACTIVITIES_CHUNK_SIZE
   );
 
-  const updateUser = () => getUser().then((user) => setUser(user));
-  useEffect(() => {
-    updateUser().finally(() => setIsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      getActivities(MAX_ACTIVITIES)
-        .then((aarpActivities) => setActivities(aarpActivities))
-        .catch(() => setActivities([]));
-    }
-  }, [user]);
-
-  const NotLoggedInPrompt = () => (
-    <div>
-      <h2>You are not logged into AARP.</h2>
+  if (aarpData === "loading") return <LoadingAnimation />;
+  if (aarpData.status !== "loggedIn")
+    return (
       <div>
+        <h2>
+          {aarpData.status === "mustConfirmPassword"
+            ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
+            : "You are not logged into AARP."}
+        </h2>
         <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
-        <a onClick={updateUser}>Refresh</a>
       </div>
-    </div>
-  );
-
-  if (!user) return isLoading ? <LoadingAnimation /> : <NotLoggedInPrompt />;
+    );
 
   return (
     <div>
       <div>
-        <h2>Hello {user.username}!</h2>
-        <h3>Rewards balance: {user.rewardsBalance ?? "unknown"}</h3>
-        <h3>Daily points left: {user.dailyPointsLeft ?? "unknown"}</h3>
+        <h2>Hello {aarpData.user.username}!</h2>
+        <h3>Rewards balance: {aarpData.user.rewardsBalance ?? "unknown"}</h3>
+        <h3>Daily points left: {aarpData.user.dailyPointsLeft ?? "unknown"}</h3>
       </div>
       <div>
-        {activities.length > 0 ? (
+        {aarpData.activities.length > 0 ? (
           <>
             <div>
-              {activities
+              {aarpData.activities
                 .slice(0, nActivitiesDisplayed)
-                .map((activity, idx) => (
-                  <Activity key={idx} activity={activity} />
+                .map((_, idx) => (
+                  <Activity key={idx} activityIdx={idx} />
                 ))}
             </div>
           </>
@@ -112,7 +110,33 @@ function AARP() {
   );
 }
 
+function AARPDataProvider({ children }: PropsWithChildren) {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<AarpUser | null>(null);
+  const [activities, setActivities] = useState<AarpActivityWithStatus[]>([]);
+
+  const aarpData: AARPData | "loading" = isLoading
+    ? "loading"
+    : user
+    ? {
+        status: user.mustConfirmPassword ? "mustConfirmPassword" : "loggedIn",
+        activities: activities,
+        user: user,
+      }
+    : { status: "notLoggedIn" };
+
+  return (
+    <AARPDataContext.Provider value={aarpData}>
+      {children}
+    </AARPDataContext.Provider>
+  );
+}
+
 export default {
   name: "AARP",
-  element: <AARP />,
+  element: (
+    <AARPDataProvider>
+      <AARP />
+    </AARPDataProvider>
+  ),
 };
