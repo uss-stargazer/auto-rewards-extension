@@ -68,7 +68,11 @@ function AARP() {
 
   return (
     <div>
-      <h2>Hello {user.username}!</h2>
+      <div>
+        <h2>Hello {user.username}!</h2>
+        <h3>Rewards balance: {user.rewardsBalance ?? "unknown"}</h3>
+        <h3>Daily points left: {user.dailyPointsLeft ?? "unknown"}</h3>
+      </div>
       <div>
         {activities.length > 0 ? (
           activities.map((activity, idx) => (

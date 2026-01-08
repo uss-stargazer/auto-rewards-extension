@@ -63,22 +63,34 @@ onUpdateAarpTabRequest(async (sendResponse, update) => {
 
 onGetUserRequest(async (sendResponse) => {
   const aarpTab = await getAarpTab();
-  const username = await chrome.cookies.get({
-    name: "game",
-    url: "https://secure.aarp.org",
-  });
-  const userFedId = await chrome.cookies.get({
-    name: "fedid",
-    url: "https://secure.aarp.org",
-  });
+  const cookies = await ["games", "fedid", "aarp_rewards_balance"].reduce<
+    Promise<{
+      [key: string]: string | null;
+    }>
+  >(async (cookiesObjPromise, cookieName) => {
+    const cookiesObj = await cookiesObjPromise;
+    const cookie = await chrome.cookies.get({ name: cookieName, url: ORIGIN });
+    cookiesObj[cookieName] = cookie && cookie.value;
+    return cookiesObj;
+  }, Promise.resolve({}));
   const accessToken = await getTabLocalStorage("access_token", aarpTab.id!);
+  const dailyPointsLeft = await getTabLocalStorage(
+    "user_daily_points_left",
+    aarpTab.id!
+  );
+
   return sendResponse(
-    (username &&
-      userFedId &&
+    (cookies["games"] &&
+      cookies["fedid"] &&
       accessToken && {
-        username: username.value,
-        fedId: userFedId.value,
+        username: cookies["games"],
+        fedId: cookies["fedid"],
         accessToken: accessToken,
+        rewardsBalance:
+          (cookies["aarp_rewards_balance"] &&
+            Number(cookies["aarp_rewards_balance"])) ||
+          undefined,
+        dailyPointsLeft: dailyPointsLeft ? Number(dailyPointsLeft) : undefined,
       }) ||
       null
   );
