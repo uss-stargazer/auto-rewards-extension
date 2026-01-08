@@ -1,14 +1,14 @@
 import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
   AarpActivity,
-  AarpActivityStatusResponse,
+  AarpActivityStatuses,
   AarpRewardsResponse,
   AarpUser,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
   onActivitiesRequest,
-  onActivityStatusRequest,
+  onActivityStatusesRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
   onUpdateAarpTabRequest,
@@ -20,7 +20,8 @@ import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
-const ACTIVITY_STATUS_API_URL = "[PLACEHOLDER]";
+const ACTIVITY_STATUS_API_URL = (userFedId: string) =>
+  `https://services.share.aarp.org/applications/loyalty-catalog/activity/limit/${userFedId}`;
 const ACTIVITY_REWARDS_API_URL = (
   userFedId: string,
   activityId: string
@@ -148,17 +149,42 @@ async function getActivities(
   return filteredActivitiesList.slice(0, maxNActivities);
 }
 
-async function getActivityStatus(
-  activityId: string,
+async function getActivityStatuses(
+  activityIds: string[],
+  userFedId: string,
   accessToken: string
-): Promise<AarpActivityStatusResponse> {
-  return await queryAarpApi(
-    ACTIVITY_STATUS_API_URL,
-    undefined,
-    accessToken,
-    REWARDS_URL,
-    ActivityStatusResponseSchema
-  );
+): Promise<AarpActivityStatuses> {
+  if (activityIds.length === 0)
+    return { activityFinishedStatuses: [], userDailyPointsLeft: undefined };
+
+  const activityFinishedStatuses: (boolean | undefined)[] = [];
+  let userDailyPointsLeft = 0;
+
+  // Activity statuses can only be gotten 10 at a time
+  for (let i = 0; i < activityIds.length; i += 10) {
+    const activityList = activityIds.slice(i, i + 10).map((id) => {
+      return { activityIdentifier: id };
+    });
+
+    const activityStatusesResponse = await queryAarpApi(
+      ACTIVITY_STATUS_API_URL(userFedId),
+      { activityList: activityList },
+      accessToken,
+      REWARDS_URL,
+      ActivityStatusResponseSchema
+    );
+
+    activityFinishedStatuses.push(
+      ...activityStatusesResponse.activityList.map((statusResponse) =>
+        statusResponse.Error === null && statusResponse.Input === null
+          ? statusResponse.limitHit
+          : undefined
+      )
+    );
+    userDailyPointsLeft = activityStatusesResponse.userDailyPointsLeft;
+  }
+
+  return { activityFinishedStatuses, userDailyPointsLeft };
 }
 
 async function earnActivityRewards(
@@ -194,8 +220,9 @@ onActivitiesRequest(async (sendResponse, { accessToken, maxNActivities }) =>
   sendResponse(await getActivities(accessToken, maxNActivities))
 );
 
-onActivityStatusRequest(async (sendResponse, { activityId, accessToken }) =>
-  sendResponse(await getActivityStatus(activityId, accessToken))
+onActivityStatusesRequest(
+  async (sendResponse, { activityIds, userFedId, accessToken }) =>
+    sendResponse(await getActivityStatuses(activityIds, userFedId, accessToken))
 );
 
 onEarnRewardsRequest(
