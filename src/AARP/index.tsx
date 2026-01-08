@@ -5,6 +5,7 @@ import {
   earnActivityRewards,
   getActivities,
   getUser,
+  updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
@@ -57,7 +58,7 @@ function AARP() {
     <div>
       <h2>You are not logged into AARP.</h2>
       <div>
-        <a href={LOGIN_URL}>Log in</a>
+        <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
         <a onClick={updateUser}>Refresh</a>
       </div>
     </div>

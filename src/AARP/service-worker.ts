@@ -7,7 +7,9 @@ import {
   onActivitiesRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
+  onUpdateAarpTabRequest,
   RewardsResponseSchema,
+  updateAarpTab,
 } from "./modules/definitions";
 import {
   isAarpTab,
@@ -48,6 +50,17 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
+onUpdateAarpTabRequest(async (sendResponse, update) => {
+  const aarpTab = await updateTabAndWaitForLoad(
+    (
+      await getAarpTab()
+    ).id!,
+    update
+  );
+  if (!aarpTab) throw new Error("Error occurred updating AARP tab");
+  return sendResponse(aarpTab.id!);
+});
+
 onGetUserRequest(async (sendResponse) => {
   const aarpTab = await getAarpTab();
   const username = await chrome.cookies.get({
@@ -81,11 +94,9 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
 
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
-  const aarpTab = await updateTabAndWaitForLoad((await getAarpTab()).id!, {
-    url: REWARDS_URL,
-    active: true,
-  });
-  if (!aarpTab) throw new Error("Error occurred updating AARP tab URL");
+  const aarpTab = await chrome.tabs.get(
+    await updateAarpTab({ url: REWARDS_URL, active: true })
+  );
 
   const activitiesList = await queryAarpApi(
     ACTIVITY_LIST_API_URL,
@@ -130,13 +141,7 @@ onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) => {
 
   if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
     return sendResponse(null);
-  if (openActivityUrl) {
-    const aarpTab = await updateTabAndWaitForLoad((await getAarpTab()).id!, {
-      url: activity.url,
-      active: true,
-    });
-    if (!aarpTab) throw new Error("Error occurred updating AARP tab URL");
-  }
+  if (openActivityUrl) await updateAarpTab({ url: activity.url, active: true });
 
   return sendResponse(
     await queryAarpApi(
