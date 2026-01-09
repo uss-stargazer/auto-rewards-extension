@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { createMessage, createTabMessage } from "../../modules/hermes";
+import { createMessage, createTabMessage } from "../../modules/safeMessages";
 
 export const SUPPORTED_ACTIVITY_TYPES = ["video"] as const;
 export type SupportedActivityType = (typeof SUPPORTED_ACTIVITY_TYPES)[number];

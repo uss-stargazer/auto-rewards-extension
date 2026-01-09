@@ -1,5 +1,5 @@
 // CREDIT: https://github.com/vocably/hermes/
-// Modified to support chrome.tabs.sendMessage
+// Modified to support chrome.tabs.sendMessage and some other stuf
 
 import MessageSender = chrome.runtime.MessageSender;
 
