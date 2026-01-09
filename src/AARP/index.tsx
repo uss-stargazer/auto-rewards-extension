@@ -4,6 +4,7 @@ import {
   AarpUser,
   earnActivityRewards,
   getActivities,
+  getActivityStatus,
   getUser,
   updateAarpTab,
 } from "./modules/definitions";
@@ -15,14 +16,28 @@ const ACTIVITIES_CHUNK_SIZE = 5;
 const MAX_ACTIVITIES = 5 * ACTIVITIES_CHUNK_SIZE;
 
 function Activity({ activity }: { activity: AarpActivity }) {
-  const [isComplete, setIsComplete] = useState<boolean>(false);
+  const [isComplete, setIsComplete] = useState<boolean>();
+
+  useEffect(() => {
+    if (!isComplete) {
+      getActivityStatus(activity.identifier).then((status) =>
+        setIsComplete(status.completed)
+      );
+    }
+  }, [isComplete]);
 
   return (
     <div>
-      <p>Activity ({activity.identifier})</p>
-      {isComplete ? (
-        <p>Completed</p>
-      ) : (
+      <div>
+        <h4>{activity.name}</h4>
+        {isComplete ? (
+          <p>Completed</p>
+        ) : (
+          <p>{activity.activityType.basePointValue}</p>
+        )}
+      </div>
+      <p>{activity.description}</p>
+      {isComplete || (
         <a
           onClick={() =>
             earnActivityRewards({
