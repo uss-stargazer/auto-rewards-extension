@@ -26,9 +26,12 @@ export interface AarpUser {
   username: string;
   fedId: string;
   accessToken: string;
+  mustConfirmPassword: boolean;
+}
+
+export interface AarpBalance {
   rewardsBalance?: number;
   dailyPointsLeft?: number;
-  mustConfirmPassword: boolean;
 }
 
 // TODO: look here for styling and cool options (like searching for topics, for example)
@@ -85,10 +88,11 @@ export type AarpRewardsResponse = z.infer<typeof RewardsResponseSchema>;
 
 // Content script message definitions -------------------------------------------------------------
 
-export const [getTabLocalStorage, onTabLocalStorageRequest] = createTabMessage<
-  string,
-  string | null
->("getTabLocalStorage");
+export const [getTabLocalStorage, onTabLocalStorageGetRequest] =
+  createTabMessage<string, string | null>("getTabLocalStorage");
+
+export const [setTabLocalStorage, onTabLocalStorageSetRequest] =
+  createTabMessage<{ key: string; value: string }, void>("setTabLocalStorage");
 
 // Service worker message definitions -------------------------------------------------------------
 
@@ -97,9 +101,10 @@ export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
   number
 >("updateAarpTab");
 
-export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
-  "getAarpUser"
-);
+export const [getUser, onGetUserRequest] = createMessage<
+  void,
+  { user: AarpUser | null; balance: AarpBalance }
+>("getAarpUser");
 
 export const [getActivities, onActivitiesRequest] = createMessage<
   { accessToken: string; maxNActivities: number },
@@ -112,13 +117,12 @@ export const [getActivityStatuses, onActivityStatusesRequest] = createMessage<
     userFedId: string;
     accessToken: string;
   },
-  AarpActivityStatuses
+  AarpActivityStatuses["activityFinishedStatuses"]
 >("getAarpActivityStatuses");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   {
     activity: { identifier: string; type: string; url: string };
-    openActivityUrl: boolean;
     user: { fedId: string; accessToken: string };
   },
   AarpRewardsResponse | null
