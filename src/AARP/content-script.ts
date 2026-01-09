@@ -1,12 +1,18 @@
 import {
   alertPossibleUserChange,
-  onTabLocalStorageRequest,
   USER_STORAGE_KEYS,
+  onTabLocalStorageGetRequest,
+  onTabLocalStorageSetRequest,
 } from "./modules/definitions";
 
-onTabLocalStorageRequest(async (sendResponse, key) =>
+onTabLocalStorageGetRequest(async (sendResponse, key) =>
   sendResponse(localStorage.getItem(key))
 );
+
+onTabLocalStorageSetRequest(async (sendResponse, { key, value }) => {
+  localStorage.setItem(key, value);
+  return sendResponse();
+});
 
 // Add listeners for localStorage to alert the service worker that the user may have changed
 

@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import {
   AarpActivity,
+  AarpBalance,
   AarpUser,
   earnActivityRewards,
   getActivities,
@@ -26,6 +27,7 @@ type AARPData =
   | {
       status: "loggedIn" | "mustConfirmPassword";
       user: AarpUser;
+      balance: AarpBalance;
       activities: AarpActivity[];
     }
   | { status: "notLoggedIn" };
@@ -40,9 +42,11 @@ const AARPDataContext = createContext<AARPData | "loading">("loading");
 function Activity({
   activityIdx,
   status,
+  onRewardsEarned,
 }: {
   activityIdx: number;
   status: ActivityStatus;
+  onRewardsEarned: () => void;
 }) {
   const aarpData = useContext(AARPDataContext);
 
@@ -63,7 +67,7 @@ function Activity({
         ) : status === "incomplete" ? (
           <p>{activity.activityType.basePointValue}</p>
         ) : (
-          <p>Error fetching status</p>
+          <p>Status unknown</p>
         )}
       </div>
       <p>{activity.description}</p>
@@ -72,8 +76,10 @@ function Activity({
           onClick={() =>
             earnActivityRewards({
               activity: { ...activity, type: activity.activityType.identifier },
-              openActivityUrl: true,
               user: { ...aarpData.user },
+            }).then((rewardsResponse) => {
+              updateAarpTab({ url: activity.url });
+              onRewardsEarned();
             })
           }
         >
@@ -134,49 +140,54 @@ function AARP() {
     }
   }, [activitiesFilter, aarpData.activities, aarpData.user]);
 
+  // Hook for updating status of shown activities defined as a function so buttons can refresh activity statuses
+  const updateActivityStatuses = async () => {
+    const activitiesToCheck = filteredActivities
+      .slice(0, nActivitiesShown) // Don't worry about those not shown
+      .filter((activityIdx) => activityStatuses[activityIdx] !== "complete")
+      .map((activityIdx) => ({
+        idx: activityIdx,
+        id: aarpData.activities[activityIdx].identifier,
+      }));
+
+    if (activitiesToCheck.length > 0) {
+      getActivityStatuses({
+        activityIds: activitiesToCheck.map(({ id }) => id),
+        userFedId: aarpData.user.fedId,
+        accessToken: aarpData.user.accessToken,
+      })
+        .then((activityFinishedStatuses) => {
+          const newActivityStatuses = activityFinishedStatuses.reduce(
+            (activityStatuses, isComplete, checkIdx) => {
+              activityStatuses[activitiesToCheck[checkIdx].idx] =
+                isComplete === undefined
+                  ? "unknown"
+                  : isComplete
+                  ? "complete"
+                  : "incomplete";
+              return activityStatuses;
+            },
+            { ...activityStatuses }
+          );
+          setActivityStatuses(newActivityStatuses);
+        })
+        .catch((reason) => {
+          console.error(
+            "Failed to fetch statuses for activities:",
+            reason,
+            "(activities:",
+            activitiesToCheck,
+            ")"
+          );
+          setActivityStatuses([]);
+        });
+    }
+  };
+
+  // The meat of this hook is really updateActivityStatuses()
   useEffect(() => {
     if (filteredActivities.length > 0 && nActivitiesShown > 0) {
-      const activitiesToCheck = filteredActivities
-        .slice(0, nActivitiesShown) // Don't worry about those not shown
-        .filter((activityIdx) => activityStatuses[activityIdx] !== "complete")
-        .map((activityIdx) => ({
-          idx: activityIdx,
-          id: aarpData.activities[activityIdx].identifier,
-        }));
-
-      if (activitiesToCheck.length > 0) {
-        getActivityStatuses({
-          activityIds: activitiesToCheck.map(({ id }) => id),
-          userFedId: aarpData.user.fedId,
-          accessToken: aarpData.user.accessToken,
-        })
-          .then(({ activityFinishedStatuses, userDailyPointsLeft }) => {
-            // TODO: activity status response also gives the daily rewards left, which should be used to update it whenever we get there
-            const newActivityStatuses = activityFinishedStatuses.reduce(
-              (activityStatuses, isComplete, checkIdx) => {
-                activityStatuses[activitiesToCheck[checkIdx].idx] =
-                  isComplete === undefined
-                    ? "unknown"
-                    : isComplete
-                    ? "complete"
-                    : "incomplete";
-                return activityStatuses;
-              },
-              { ...activityStatuses }
-            );
-            setActivityStatuses(newActivityStatuses);
-          })
-          .catch((reason) => {
-            console.error(
-              "Failed to fetch statuses for activities:",
-              reason,
-              "(activities:",
-              activitiesToCheck,
-              ")"
-            );
-            setActivityStatuses([]);
-          });
-      }
+      updateActivityStatuses();
     }
   }, [filteredActivities, nActivitiesShown]);
 
@@ -186,14 +197,17 @@ function AARP() {
     <div>
       <div>
         <h2>Hello {aarpData.user.username}!</h2>
-        <h3>Rewards balance: {aarpData.user.rewardsBalance ?? "unknown"}</h3>
-        <h3>Daily points left: {aarpData.user.dailyPointsLeft ?? "unknown"}</h3>
+        <h3>Rewards balance: {aarpData.balance.rewardsBalance ?? "unknown"}</h3>
+        <h3>
+          Daily points left: {aarpData.balance.dailyPointsLeft ?? "unknown"}
+        </h3>
       </div>
       <div>
         {activitiesAreLoading ? (
           <LoadingAnimation />
         ) : aarpData.activities.length > 0 ? (
           <>
+            <a onClick={updateActivityStatuses}>Refresh</a>
             <div>
               {nActivitiesShown > 0 ? (
                 filteredActivities
@@ -203,6 +217,7 @@ function AARP() {
                       key={activityIdx}
                       activityIdx={activityIdx}
                       status={activityStatuses[activityIdx] ?? "unknown"}
+                      onRewardsEarned={updateActivityStatuses}
                     />
                   ))
               ) : (
@@ -237,6 +252,7 @@ function AARP() {
 function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
+  const [balance, setBalance] = useState<AarpBalance>({});
   const [activities, setActivities] = useState<AarpActivity[]>([]);
 
   // Listen for potential user changes from service worker (via a port)
@@ -246,7 +262,10 @@ function AARPDataProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     getUser()
-      .then((newUser) => setUser(newUser))
+      .then(({ user: newUser, balance: newBalance }) => {
+        setUser(newUser);
+        setBalance(newBalance);
+      })
       .finally(() => setIsLoading(false));
 
     const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
@@ -258,8 +277,15 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   // Update port message listener has seperate effect because it relies on user state
   useEffect(() => {
     if (port) {
-      const userUpdateListener = (newUser: AarpUser | null) => {
+      const userUpdateListener = ({
+        user: newUser,
+        balance: newBalance,
+      }: {
+        user: AarpUser | null;
+        balance: AarpBalance;
+      }) => {
         if (!simpleDeepCompare(user, newUser)) setUser(newUser);
+        if (!simpleDeepCompare(balance, newBalance)) setBalance(newBalance);
       };
       port.onMessage.addListener(userUpdateListener);
       return () => port.onMessage.removeListener(userUpdateListener);
@@ -286,8 +312,9 @@ function AARPDataProvider({ children }: PropsWithChildren) {
     : user
     ? {
         status: user.mustConfirmPassword ? "mustConfirmPassword" : "loggedIn",
-        activities: activities,
-        user: user,
+        user,
+        balance,
+        activities,
       }
     : { status: "notLoggedIn" };
 
