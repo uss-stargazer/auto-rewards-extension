@@ -4,6 +4,7 @@ import {
   AarpActivityStatuses,
   AarpRewardsResponse,
   AarpUser,
+  ACCESS_TOKEN_STORAGE_KEYS,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
@@ -11,12 +12,16 @@ import {
   onActivityStatusesRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
+  onPossibleUserChangeAlert,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
+  USER_COOKIES,
 } from "./modules/definitions";
 import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
+
+// Utilities --------------------------------------------------------------------------------------
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
@@ -24,7 +29,7 @@ const ACTIVITY_STATUS_API_URL = (userFedId: string) =>
   `https://services.share.aarp.org/applications/loyalty-catalog/activity/limit/${userFedId}`;
 const ACTIVITY_REWARDS_API_URL = (
   userFedId: string,
-  activityId: string
+  activityId: string,
 ): string =>
   `https://services.share.aarp.org/applications/loyalty-catalog/activity/usergroup/member/user/${userFedId}/${activityId}`;
 
@@ -37,7 +42,7 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
       const listener = (
         tabId: number,
         changeInfo: chrome.tabs.OnUpdatedInfo,
-        tab: chrome.tabs.Tab
+        tab: chrome.tabs.Tab,
       ) => {
         if (tabId === newTab.id && changeInfo.status === "complete") {
           chrome.tabs.onUpdated.removeListener(listener);
@@ -49,14 +54,16 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
+// Message functions ------------------------------------------------------------------------------
+
 async function updateAarpTab(
-  update: chrome.tabs.UpdateProperties
+  update: chrome.tabs.UpdateProperties,
 ): Promise<number> {
   const aarpTab = await updateTabAndWaitForLoad(
     (
       await getAarpTab()
     ).id!,
-    update
+    update,
   );
   if (!aarpTab) throw new Error("Error occurred updating AARP tab");
   return aarpTab.id!;
@@ -64,13 +71,7 @@ async function updateAarpTab(
 
 async function getUser(): Promise<AarpUser | null> {
   const aarpTab = await getAarpTab();
-  const cookies = await [
-    "games",
-    "fedid",
-    "aarp_rewards_balance",
-    "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
-    "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
-  ].reduce<
+  const cookies = await USER_COOKIES.reduce<
     Promise<{
       [key: string]: string | null;
     }>
@@ -82,13 +83,12 @@ async function getUser(): Promise<AarpUser | null> {
   }, Promise.resolve({}));
 
   const accessToken =
-    (await getTabLocalStorage("access_token", aarpTab.id!)) ??
-    (await getTabLocalStorage("acctAccessToken", aarpTab.id!));
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[0], aarpTab.id!)) ??
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[1], aarpTab.id!));
   const dailyPointsLeft = await getTabLocalStorage(
     "user_daily_points_left",
-    aarpTab.id!
+    aarpTab.id!,
   );
-
   const user: AarpUser | null =
     (cookies["fedid"] &&
       accessToken && {
@@ -110,12 +110,12 @@ async function getUser(): Promise<AarpUser | null> {
 
 async function getActivities(
   accessToken: string,
-  maxNActivities: number
+  maxNActivities: number,
 ): Promise<AarpActivity[]> {
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
   const aarpTab = await chrome.tabs.get(
-    await updateAarpTab({ url: REWARDS_URL })
+    await updateAarpTab({ url: REWARDS_URL }),
   );
 
   const activitiesList = await queryAarpApi(
@@ -124,7 +124,7 @@ async function getActivities(
     accessToken,
     aarpTab.url!,
     ActivitiesListSchema,
-    "GET"
+    "GET",
   );
 
   // We need to filter out outdated/inactive activities as well as activites we can't automate
@@ -134,7 +134,7 @@ async function getActivities(
       activity.active &&
       (activity.deleted === null || !activity.deleted) &&
       SUPPORTED_ACTIVITY_TYPES.includes(
-        activity.activityType.identifier as SupportedActivityType
+        activity.activityType.identifier as SupportedActivityType,
       )
     ) {
       const dateRange = [
@@ -152,7 +152,7 @@ async function getActivities(
 async function getActivityStatuses(
   activityIds: string[],
   userFedId: string,
-  accessToken: string
+  accessToken: string,
 ): Promise<AarpActivityStatuses> {
   if (activityIds.length === 0)
     return { activityFinishedStatuses: [], userDailyPointsLeft: undefined };
@@ -171,15 +171,15 @@ async function getActivityStatuses(
       { activityList: activityList },
       accessToken,
       REWARDS_URL,
-      ActivityStatusResponseSchema
+      ActivityStatusResponseSchema,
     );
 
     activityFinishedStatuses.push(
       ...activityStatusesResponse.activityList.map((statusResponse) =>
         statusResponse.Error === null && statusResponse.Input === null
           ? statusResponse.limitHit
-          : undefined
-      )
+          : undefined,
+      ),
     );
     userDailyPointsLeft = activityStatusesResponse.userDailyPointsLeft;
   }
@@ -190,7 +190,7 @@ async function getActivityStatuses(
 async function earnActivityRewards(
   activity: { identifier: string; type: string; url: string },
   openActivityUrl: boolean,
-  user: { fedId: string; accessToken: string }
+  user: { fedId: string; accessToken: string },
 ): Promise<AarpRewardsResponse | null> {
   if (
     !SUPPORTED_ACTIVITY_TYPES.includes(activity.type as SupportedActivityType)
@@ -204,28 +204,63 @@ async function earnActivityRewards(
     {},
     user.accessToken,
     activity.url,
-    RewardsResponseSchema
+    RewardsResponseSchema,
   );
 }
 
-// Register message listeners -----------------------------------------------
+// Register functional message listeners ----------------------------------------------------------
 
 onUpdateAarpTabRequest(async (sendResponse, update) =>
-  sendResponse(await updateAarpTab(update))
+  sendResponse(await updateAarpTab(update)),
 );
 
 onGetUserRequest(async (sendResponse) => sendResponse(await getUser()));
 
 onActivitiesRequest(async (sendResponse, { accessToken, maxNActivities }) =>
-  sendResponse(await getActivities(accessToken, maxNActivities))
+  sendResponse(await getActivities(accessToken, maxNActivities)),
 );
 
 onActivityStatusesRequest(
   async (sendResponse, { activityIds, userFedId, accessToken }) =>
-    sendResponse(await getActivityStatuses(activityIds, userFedId, accessToken))
+    sendResponse(
+      await getActivityStatuses(activityIds, userFedId, accessToken),
+    ),
 );
 
 onEarnRewardsRequest(
   async (sendResponse, { activity, openActivityUrl, user }) =>
-    sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
+    sendResponse(await earnActivityRewards(activity, openActivityUrl, user)),
 );
+
+// Register message listeners involving side panel and content commmunication ---------------------
+
+let sidepanelPort: chrome.runtime.Port | null = null;
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === "sidepanel-port") {
+    sidepanelPort = port;
+    sidepanelPort.onDisconnect.addListener(() => {
+      sidepanelPort = null;
+    });
+  }
+});
+
+// When user actually changes a lot of little changes happen in a short period so instead of fetching user and sending to
+// sidepanel for each, set a timeout that waits a little after each request before finally executing when it slows.
+const USER_UPDATE_BUFFER_MS = 1000;
+let sendUserUpdateTimeout: NodeJS.Timeout | null = null;
+
+function onPossibleUserChange() {
+  if (sendUserUpdateTimeout) clearTimeout(sendUserUpdateTimeout);
+  sendUserUpdateTimeout = setTimeout(async () => {
+    if (sidepanelPort) sidepanelPort.postMessage(await getUser());
+  }, USER_UPDATE_BUFFER_MS);
+}
+
+onPossibleUserChangeAlert(async (sendResponse) =>
+  sendResponse(onPossibleUserChange()),
+);
+
+chrome.cookies.onChanged.addListener((change) => {
+  if (USER_COOKIES.includes(change.cookie.name)) onPossibleUserChange();
+});
