@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import {
-  AarpActivityWithStatus,
+  AarpActivity,
   AarpUser,
   earnActivityRewards,
   getActivities,
@@ -21,17 +21,23 @@ type AARPData =
   | {
       status: "loggedIn" | "mustConfirmPassword";
       user: AarpUser;
-      activities: AarpActivityWithStatus[];
+      activities: AarpActivity[];
     }
   | { status: "notLoggedIn" };
 
 const MAX_DAILY_REWARDS = 5000;
 const ACTIVITIES_CHUNK_SIZE = 5;
-const MAX_ACTIVITIES = 4000; // Should never really get beyond this, but just a cut off in that case
+const MAX_ACTIVITIES = 4000; // Should never really get beyond this, but a cut off just in case
 
 const AARPDataContext = createContext<AARPData | "loading">("loading");
 
-function Activity({ activityIdx }: { activityIdx: number }) {
+function Activity({
+  activityIdx,
+  isCompleted,
+}: {
+  activityIdx: number;
+  isCompleted: boolean;
+}) {
   const aarpData = useContext(AARPDataContext);
 
   if (aarpData === "loading" || aarpData.status !== "loggedIn")
@@ -46,14 +52,14 @@ function Activity({ activityIdx }: { activityIdx: number }) {
     <div>
       <div>
         <h4>{activity.name}</h4>
-        {activity.isCompleted ? (
+        {isCompleted ? (
           <p>Completed</p>
         ) : (
           <p>{activity.activityType.basePointValue}</p>
         )}
       </div>
       <p>{activity.description}</p>
-      {activity.isCompleted || (
+      {isCompleted || (
         <a
           onClick={() =>
             earnActivityRewards({
@@ -105,7 +111,7 @@ function AARP() {
               {aarpData.activities
                 .slice(0, nActivitiesDisplayed)
                 .map((_, idx) => (
-                  <Activity key={idx} activityIdx={idx} />
+                  <Activity key={idx} activityIdx={idx} isCompleted={false} />
                 ))}
             </div>
           </>
@@ -120,7 +126,7 @@ function AARP() {
 function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
-  const [activities, setActivities] = useState<AarpActivityWithStatus[]>([]);
+  const [activities, setActivities] = useState<AarpActivity[]>([]);
 
   const fullyLoggedIn = !isLoading && user && !user.mustConfirmPassword;
 
@@ -160,13 +166,8 @@ function AARPDataProvider({ children }: PropsWithChildren) {
         maxNActivities: MAX_ACTIVITIES,
         accessToken: user.accessToken,
       })
-        .then((aarpActivities) => {
-          setActivities(
-            aarpActivities.map((activity) => ({
-              ...activity,
-              isCompleted: false,
-            }))
-          );
+        .then((newActivities) => {
+          setActivities(newActivities);
         })
         .catch(() => setActivities([]));
     } else {
