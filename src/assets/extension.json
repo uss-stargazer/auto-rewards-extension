@@ -1,0 +1,35 @@
+{
+  "$schema": "./extension.schema.json",
+  "baseManifestJson": {
+    "manifest_version": 3,
+    "name": "AutoRewards",
+    "description": "A Chrome extension to automate gathering rewards for a handful of platforms (for example, Microsoft Rewards).",
+    "version": "1.0",
+    "permissions": ["storage", "sidePanel", "tabs", "cookies", "scripting"],
+    "host_permissions": ["https://*.aarp.org/**"],
+    "icons": {
+      "16": "icon/16x16.png",
+      "48": "icon/48x48.png",
+      "128": "icon/128x128.png",
+      "256": "icon/256x256.png"
+    },
+    "action": {
+      "default_icon": {
+        "16": "icon/16x16.png",
+        "24": "icon/24x24.png",
+        "32": "icon/32x32.png"
+      }
+    },
+    "side_panel": { "default_path": "sidepanel.html" },
+    "options_ui": { "page": "options.html" }
+  },
+  "options": "options.tsx",
+  "sidepanel": "sidepanel.tsx",
+  "background": ["service-worker.ts"],
+  "contentScripts": [
+    {
+      "urlMatches": ["<all_urls>"],
+      "scripts": [{ "name": "contentScript", "path": "content-script.ts" }]
+    }
+  ]
+}
