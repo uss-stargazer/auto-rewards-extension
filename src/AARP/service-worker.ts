@@ -2,6 +2,7 @@ import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
   AarpActivity,
   AarpActivityStatuses,
+  AarpBalance,
   AarpRewardsResponse,
   AarpUser,
   ACCESS_TOKEN_STORAGE_KEYS,
@@ -15,6 +16,7 @@ import {
   onPossibleUserChangeAlert,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
+  setTabLocalStorage,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
   USER_COOKIES,
@@ -69,7 +71,10 @@ async function updateAarpTab(
   return aarpTab.id!;
 }
 
-async function getUser(): Promise<AarpUser | null> {
+async function getUser(): Promise<{
+  user: AarpUser | null;
+  balance: AarpBalance;
+}> {
   const aarpTab = await getAarpTab();
   const cookies = await USER_COOKIES.reduce<
     Promise<{
@@ -89,23 +94,27 @@ async function getUser(): Promise<AarpUser | null> {
     "user_daily_points_left",
     aarpTab.id!
   );
+
   const user: AarpUser | null =
     (cookies["fedid"] &&
       accessToken && {
         username: cookies["games"] ?? "unknown",
         fedId: cookies["fedid"],
         accessToken: accessToken,
-        rewardsBalance:
-          (cookies["aarp_rewards_balance"] &&
-            Number(cookies["aarp_rewards_balance"])) ||
-          undefined,
-        dailyPointsLeft: dailyPointsLeft ? Number(dailyPointsLeft) : undefined,
         mustConfirmPassword:
           !cookies["AARP_SSO_AUTH_EX"] || !cookies["AARP_SSO_AUTH2"],
       }) ||
     null;
 
-  return user;
+  return {
+    user,
+    balance: {
+      rewardsBalance: cookies["aarp_rewards_balance"]
+        ? Number(cookies["aarp_rewards_balance"])
+        : undefined,
+      dailyPointsLeft: dailyPointsLeft ? Number(dailyPointsLeft) : undefined,
+    },
+  };
 }
 
 async function getActivities(
@@ -153,9 +162,10 @@ async function getActivityStatuses(
   activityIds: string[],
   userFedId: string,
   accessToken: string
-): Promise<AarpActivityStatuses> {
-  if (activityIds.length === 0)
-    return { activityFinishedStatuses: [], userDailyPointsLeft: undefined };
+): Promise<AarpActivityStatuses["activityFinishedStatuses"]> {
+  if (activityIds.length === 0) return [];
+
+  const aarpTab = await getAarpTab();
 
   const activityFinishedStatuses: (boolean | undefined)[] = [];
   let userDailyPointsLeft = 0;
@@ -184,12 +194,16 @@ async function getActivityStatuses(
     userDailyPointsLeft = activityStatusesResponse.userDailyPointsLeft;
   }
 
-  return { activityFinishedStatuses, userDailyPointsLeft };
+  setTabLocalStorage(
+    { key: "user_daily_points_left", value: userDailyPointsLeft.toString() },
+    aarpTab.id!
+  );
+
+  return activityFinishedStatuses;
 }
 
 async function earnActivityRewards(
   activity: { identifier: string; type: string; url: string },
-  openActivityUrl: boolean,
   user: { fedId: string; accessToken: string }
 ): Promise<AarpRewardsResponse | null> {
   if (
@@ -197,15 +211,33 @@ async function earnActivityRewards(
   )
     return null;
 
-  if (openActivityUrl) await updateAarpTab({ url: activity.url });
-
-  return await queryAarpApi(
+  const rewardsResponse = await queryAarpApi(
     ACTIVITY_REWARDS_API_URL(user.fedId, activity.identifier),
     {},
     user.accessToken,
     activity.url,
     RewardsResponseSchema
   );
+
+  // Write aarp_rewards_balance manually (cookie listener below already
+  // listens for this so no need to manually send balance update)
+  const balanceCookie = {
+    url: ORIGIN,
+    name: "aarp_rewards_balance",
+  };
+  const previousBalance = await chrome.cookies.get({ ...balanceCookie });
+  const newBalance =
+    (previousBalance ? Number(previousBalance.value) : 0) +
+    rewardsResponse.pointsEarned;
+  if (previousBalance?.value !== newBalance.toString()) {
+    await chrome.cookies.remove({ ...balanceCookie });
+    await chrome.cookies.set({
+      ...balanceCookie,
+      value: newBalance.toString(),
+    });
+  }
+
+  return rewardsResponse;
 }
 
 // Register functional message listeners ----------------------------------------------------------
@@ -225,9 +257,8 @@ onActivityStatusesRequest(
     sendResponse(await getActivityStatuses(activityIds, userFedId, accessToken))
 );
 
-onEarnRewardsRequest(
-  async (sendResponse, { activity, openActivityUrl, user }) =>
-    sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
+onEarnRewardsRequest(async (sendResponse, { activity, user }) =>
+  sendResponse(await earnActivityRewards(activity, user))
 );
 
 // Register message listeners involving side panel and content commmunication ---------------------
@@ -257,13 +288,13 @@ function onPossibleUserChange() {
   if (sendUserUpdateTimeout) clearTimeout(sendUserUpdateTimeout);
   sendUserUpdateTimeout = setTimeout(async () => {
     if (sidepanelPort) {
-      const user = await getUser();
+      const { user, balance } = await getUser();
       console.log(
         "[background, userChangeAlert] got current user",
         user,
         "and sending update"
       );
-      sidepanelPort.postMessage(user);
+      sidepanelPort.postMessage({ user, balance });
     }
   }, USER_UPDATE_BUFFER_MS);
 }
