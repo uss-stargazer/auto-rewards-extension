@@ -1,16 +1,6 @@
 import * as z from "zod";
 import { createMessage, createTabMessage } from "../../modules/hermes";
 
-export class NotLoggedInError extends Error {
-  name: string = "NotLoggedInError";
-  loginUrl: string;
-
-  constructor(message: string, loginUrl: string) {
-    super(message);
-    this.loginUrl = loginUrl;
-  }
-}
-
 // Types and schemas ------------------------------------------------------------------------------
 
 export interface AarpUser {
@@ -83,16 +73,20 @@ export const [getUser, onGetUserRequest] = createMessage<void, AarpUser | null>(
 );
 
 export const [getActivities, onActivitiesRequest] = createMessage<
-  number,
+  { accessToken: string; maxNActivities: number },
   AarpActivity[]
 >("getAarpActivites");
 
 export const [getActivityStatus, onActivityStatusRequest] = createMessage<
-  string,
+  { activityId: string; accessToken: string },
   AarpActivityStatusResponse
 >("getAarpActivityStatus");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
-  { activity: AarpActivity; openActivityUrl: boolean },
+  {
+    activity: { identifier: string; type: string; url: string };
+    openActivityUrl: boolean;
+    user: { fedId: string; accessToken: string };
+  },
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");
