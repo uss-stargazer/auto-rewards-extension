@@ -85,7 +85,9 @@ function AARP() {
             ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
             : "You are not logged into AARP."}
         </h2>
-        <a onClick={() => updateAarpTab({ url: LOGIN_URL })}>Log in</a>
+        <a onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}>
+          Log in
+        </a>
       </div>
     );
 
