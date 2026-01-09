@@ -46,6 +46,11 @@ const ActivitySchema = z.object({
 export type AarpActivity = z.infer<typeof ActivitySchema>;
 export const ActivitiesListSchema = z.array(ActivitySchema);
 
+export const ActivityStatusResponseSchema = z.object({});
+export type AarpActivityStatusResponse = z.infer<
+  typeof ActivityStatusResponseSchema
+>;
+
 export const RewardsResponseSchema = z.object({
   activityCompleted: z.uuid(),
   pointsEarned: z.number(),
@@ -77,6 +82,11 @@ export const [getActivities, onActivitiesRequest] = createMessage<
   number,
   AarpActivity[]
 >("getAarpActivites");
+
+export const [getActivityStatus, onActivityStatusRequest] = createMessage<
+  string,
+  AarpActivityStatusResponse
+>("getAarpActivityStatus");
 
 export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   { activity: AarpActivity; openActivityUrl: boolean },
