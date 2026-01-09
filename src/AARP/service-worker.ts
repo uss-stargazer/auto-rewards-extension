@@ -1,10 +1,12 @@
 import { updateTabAndWaitForLoad } from "../modules/utils";
 import {
   ActivitiesListSchema,
+  ActivityStatusResponseSchema,
   getTabLocalStorage,
   getUser,
   NotLoggedInError,
   onActivitiesRequest,
+  onActivityStatusRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
   onUpdateAarpTabRequest,
@@ -21,6 +23,7 @@ import {
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
+const ACTIVITY_STATUS_API_URL = "[PLACEHOLDER]";
 const ACTIVITY_REWARDS_API_URL = (
   userFedId: string,
   activityId: string
@@ -136,6 +139,25 @@ onActivitiesRequest(async (sendResponse, maxNActivities) => {
   });
 
   return sendResponse(filteredActivitiesList.slice(0, maxNActivities));
+});
+
+onActivityStatusRequest(async (sendResponse) => {
+  const user = await getUser();
+  if (!user)
+    throw new NotLoggedInError(
+      "You must be logged into AARP to get activity statusi",
+      LOGIN_URL
+    );
+
+  return sendResponse(
+    await queryAarpApi(
+      ACTIVITY_STATUS_API_URL,
+      undefined,
+      user.accessToken,
+      REWARDS_URL,
+      ActivityStatusResponseSchema
+    )
+  );
 });
 
 /**
