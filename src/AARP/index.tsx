@@ -53,8 +53,13 @@ function Activity({ activityIdx }: { activityIdx: number }) {
         <a
           onClick={() =>
             earnActivityRewards({
-              activity: activity,
+              activity: {
+                identifier: activity.identifier,
+                url: activity.url,
+                type: activity.activityType.identifier,
+              },
               openActivityUrl: true,
+              user: aarpData.user,
             })
           }
         >
