@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/uss-stargazer/auto-rewards-extension/src/assets/extension.schema.json",
+  "title": "Chrome Extension configuration",
+  "description": "A higher level configuration of Chrome's manifest.json for webpack to convert to manifest",
+  "type": "object",
+  "properties": {
+    "baseManifestJson": {
+      "description": "Base properties for manifest.json",
+      "$ref": "http://json.schemastore.org/chrome-manifest"
+    },
+    "options": {
+      "description": "Path to jsx/tsx file for options page, relative to `src/`",
+      "type": "string"
+    },
+    "sidepanel": {
+      "description": "Path to jsx/tsx file for sidepanel page, relative to `src/`",
+      "type": "string"
+    },
+    "background": {
+      "description": "Paths to background or service worker scripts, relative to `src/`",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contentScripts": {
+      "description": "Content scripts (with options) to be included in certain pages",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "urlMatches": {
+            "description": "URL matches to run content script",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "scripts": {
+            "description": "Content script information",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "description": "Name of the resulting content script file",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Path to the source content script, relative to `src/`",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

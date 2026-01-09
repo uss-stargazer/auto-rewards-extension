@@ -1,0 +1,7 @@
+npm-debug.log
+node_modules/
+dist/
+tmp/
+
+# webpack/webpack.common.js rewrites public/manifest.json based on src/assets/extension.json
+public/manifest.json
