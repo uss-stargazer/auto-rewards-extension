@@ -2,10 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import AARP from "./AARP";
+import useTheme from "./hooks/useTheme";
 
 const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
+  useTheme();
+
   return (
     <div>
       <h1>Sidepanel</h1>
