@@ -15,7 +15,7 @@ import {
   updateAarpTab,
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
-import { isAarpTab, LOGIN_URL } from "./modules/tools";
+import { LOGIN_URL } from "./modules/tools";
 import { simpleDeepCompare } from "../modules/utils";
 import {
   ActivitiesFilter,
@@ -239,37 +239,32 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AarpUser | null>(null);
   const [activities, setActivities] = useState<AarpActivity[]>([]);
 
+  // Listen for potential user changes from service worker (via a port)
+  const [port, setPort] = useState<chrome.runtime.Port | null>(null);
+
   const fullyLoggedIn = !isLoading && user && !user.mustConfirmPassword;
 
   useEffect(() => {
-    // If a tab goes to an AARP url, we need to check to see if the user has changed and if the
-    const updateUserListener = (
-      _: any,
-      update: chrome.tabs.UpdateProperties,
-      tab: chrome.tabs.Tab
-    ) => {
-      if (
-        tab.active &&
-        update.url &&
-        tab.status === "complete" &&
-        isAarpTab(tab.url)
-      ) {
-        if (!isLoading) setIsLoading(true);
-        getUser()
-          .then((newUser) => {
-            if (!simpleDeepCompare(user, newUser)) setUser(newUser);
-          })
-          .finally(() => setIsLoading(false));
-      }
-    };
+    getUser()
+      .then((newUser) => setUser(newUser))
+      .finally(() => setIsLoading(false));
 
-    chrome.tabs.onUpdated.addListener(updateUserListener);
+    const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
+    setPort(sidepanelPort);
 
-    // Trigger listener to get initial user and activiites
-    updateAarpTab({ active: true });
-
-    return () => chrome.tabs.onUpdated.removeListener(updateUserListener);
+    return sidepanelPort.disconnect;
   }, []);
+
+  // Update port message listener has seperate effect because it relies on user state
+  useEffect(() => {
+    if (port) {
+      const userUpdateListener = (newUser: AarpUser | null) => {
+        if (!simpleDeepCompare(user, newUser)) setUser(newUser);
+      };
+      port.onMessage.addListener(userUpdateListener);
+      return () => port.onMessage.removeListener(userUpdateListener);
+    }
+  }, [port, user]);
 
   useEffect(() => {
     if (fullyLoggedIn) {

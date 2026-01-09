@@ -4,6 +4,19 @@ import { createMessage, createTabMessage } from "../../modules/hermes";
 export const SUPPORTED_ACTIVITY_TYPES = ["video"] as const;
 export type SupportedActivityType = (typeof SUPPORTED_ACTIVITY_TYPES)[number];
 
+export const ACCESS_TOKEN_STORAGE_KEYS = ["access_token", "acctAccessToken"];
+export const USER_STORAGE_KEYS = [
+  ...ACCESS_TOKEN_STORAGE_KEYS,
+  "user_daily_points_left",
+];
+export const USER_COOKIES = [
+  "games",
+  "fedid",
+  "aarp_rewards_balance",
+  "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
+  "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
+];
+
 // Types and schemas ------------------------------------------------------------------------------
 
 export interface AarpUser {
@@ -107,3 +120,9 @@ export const [earnActivityRewards, onEarnRewardsRequest] = createMessage<
   },
   AarpRewardsResponse | null
 >("earnAarpActivityRewards");
+
+// The following is still a service worker message but
+// is more a background mechanism, not an AARP function
+
+export const [alertPossibleUserChange, onPossibleUserChangeAlert] =
+  createMessage<void, void>("possibleUserChangeAlert");

@@ -4,6 +4,7 @@ import {
   AarpActivityStatuses,
   AarpRewardsResponse,
   AarpUser,
+  ACCESS_TOKEN_STORAGE_KEYS,
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
@@ -11,12 +12,16 @@ import {
   onActivityStatusesRequest,
   onEarnRewardsRequest,
   onGetUserRequest,
+  onPossibleUserChangeAlert,
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
   SUPPORTED_ACTIVITY_TYPES,
   SupportedActivityType,
+  USER_COOKIES,
 } from "./modules/definitions";
 import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
+
+// Utilities --------------------------------------------------------------------------------------
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
@@ -49,6 +54,8 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   });
 }
 
+// Message functions ------------------------------------------------------------------------------
+
 async function updateAarpTab(
   update: chrome.tabs.UpdateProperties
 ): Promise<number> {
@@ -64,13 +71,7 @@ async function updateAarpTab(
 
 async function getUser(): Promise<AarpUser | null> {
   const aarpTab = await getAarpTab();
-  const cookies = await [
-    "games",
-    "fedid",
-    "aarp_rewards_balance",
-    "AARP_SSO_AUTH_EX", // For checking whether user is 'fully' signed in
-    "AARP_SSO_AUTH2", // For checking whether user is 'fully' signed in
-  ].reduce<
+  const cookies = await USER_COOKIES.reduce<
     Promise<{
       [key: string]: string | null;
     }>
@@ -82,13 +83,12 @@ async function getUser(): Promise<AarpUser | null> {
   }, Promise.resolve({}));
 
   const accessToken =
-    (await getTabLocalStorage("access_token", aarpTab.id!)) ??
-    (await getTabLocalStorage("acctAccessToken", aarpTab.id!));
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[0], aarpTab.id!)) ??
+    (await getTabLocalStorage(ACCESS_TOKEN_STORAGE_KEYS[1], aarpTab.id!));
   const dailyPointsLeft = await getTabLocalStorage(
     "user_daily_points_left",
     aarpTab.id!
   );
-
   const user: AarpUser | null =
     (cookies["fedid"] &&
       accessToken && {
@@ -208,7 +208,7 @@ async function earnActivityRewards(
   );
 }
 
-// Register message listeners -----------------------------------------------
+// Register functional message listeners ----------------------------------------------------------
 
 onUpdateAarpTabRequest(async (sendResponse, update) =>
   sendResponse(await updateAarpTab(update))
@@ -229,3 +229,57 @@ onEarnRewardsRequest(
   async (sendResponse, { activity, openActivityUrl, user }) =>
     sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
 );
+
+// Register message listeners involving side panel and content commmunication ---------------------
+
+let sidepanelPort: chrome.runtime.Port | null = null;
+
+chrome.runtime.onConnect.addListener(function (port) {
+  console.log("Side panel connected:", port.name);
+  if (port.name === "sidepanel-port") {
+    sidepanelPort = port;
+
+    // Optional: Handle port disconnection (e.g., when the side panel is closed)
+    sidepanelPort.onDisconnect.addListener(function () {
+      console.log("Side panel disconnected");
+      sidepanelPort = null;
+    });
+  }
+});
+
+// When user actually changes a lot of little changes happen in a short period so instead of fetching user and sending to
+// sidepanel for each, set a timeout that waits a little after each request before finally executing when it slows.
+const USER_UPDATE_BUFFER_MS = 1000;
+let sendUserUpdateTimeout: NodeJS.Timeout | null = null;
+
+function onPossibleUserChange() {
+  console.log("[background, userChangeAlert] got possible user change alert");
+  if (sendUserUpdateTimeout) clearTimeout(sendUserUpdateTimeout);
+  sendUserUpdateTimeout = setTimeout(async () => {
+    if (sidepanelPort) {
+      const user = await getUser();
+      console.log(
+        "[background, userChangeAlert] got current user",
+        user,
+        "and sending update"
+      );
+      sidepanelPort.postMessage(user);
+    }
+  }, USER_UPDATE_BUFFER_MS);
+}
+
+onPossibleUserChangeAlert(async (sendResponse) =>
+  sendResponse(onPossibleUserChange())
+);
+
+chrome.cookies.onChanged.addListener((change) => {
+  console.log("[background, cookie listener] got cookie change", change);
+  if (USER_COOKIES.includes(change.cookie.name)) {
+    console.log(
+      "[background, cookie listener] identified cookie change",
+      change.cookie.name,
+      "as possible user change and sent alert"
+    );
+    onPossibleUserChange();
+  }
+});
