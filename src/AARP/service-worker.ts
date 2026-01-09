@@ -7,7 +7,6 @@ import {
   ActivitiesListSchema,
   ActivityStatusResponseSchema,
   getTabLocalStorage,
-  NotLoggedInError,
   onActivitiesRequest,
   onActivityStatusRequest,
   onEarnRewardsRequest,
@@ -15,13 +14,7 @@ import {
   onUpdateAarpTabRequest,
   RewardsResponseSchema,
 } from "./modules/definitions";
-import {
-  isAarpTab,
-  LOGIN_URL,
-  ORIGIN,
-  queryAarpApi,
-  REWARDS_URL,
-} from "./modules/tools";
+import { isAarpTab, ORIGIN, queryAarpApi, REWARDS_URL } from "./modules/tools";
 
 const ACTIVITY_LIST_API_URL =
   "https://services.share.aarp.org/applications/loyalty-catalog/activity/listV3";
@@ -95,7 +88,7 @@ async function getUser(): Promise<AarpUser | null> {
     aarpTab.id!
   );
 
-  const user =
+  const user: AarpUser | null =
     (cookies["fedid"] &&
       accessToken && {
         username: cookies["games"] ?? "unknown",
@@ -114,14 +107,10 @@ async function getUser(): Promise<AarpUser | null> {
   return user;
 }
 
-async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
-  const user = await getUser();
-  if (!user)
-    throw new NotLoggedInError(
-      "You must be logged into AARP to get activities",
-      LOGIN_URL
-    );
-
+async function getActivities(
+  accessToken: string,
+  maxNActivities: number
+): Promise<AarpActivity[]> {
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
   const aarpTab = await chrome.tabs.get(
@@ -131,7 +120,7 @@ async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
   const activitiesList = await queryAarpApi(
     ACTIVITY_LIST_API_URL,
     undefined,
-    user.accessToken,
+    accessToken,
     aarpTab.url!,
     ActivitiesListSchema,
     "GET"
@@ -158,37 +147,24 @@ async function getActivities(maxNActivities: number): Promise<AarpActivity[]> {
 }
 
 async function getActivityStatus(
-  activityId: string
+  activityId: string,
+  accessToken: string
 ): Promise<AarpActivityStatusResponse> {
-  const user = await getUser();
-  if (!user)
-    throw new NotLoggedInError(
-      "You must be logged into AARP to get activity statusi",
-      LOGIN_URL
-    );
-
   return await queryAarpApi(
     ACTIVITY_STATUS_API_URL,
     undefined,
-    user.accessToken,
+    accessToken,
     REWARDS_URL,
     ActivityStatusResponseSchema
   );
 }
 
 async function earnActivityRewards(
-  activity: AarpActivity,
-  openActivityUrl: boolean
+  activity: { identifier: string; type: string; url: string },
+  openActivityUrl: boolean,
+  user: { fedId: string; accessToken: string }
 ): Promise<AarpRewardsResponse | null> {
-  const user = await getUser();
-  if (!user)
-    throw new NotLoggedInError(
-      "You must be signed into AARP to earn video rewards",
-      LOGIN_URL
-    );
-
-  if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.activityType.identifier))
-    return null;
+  if (!SUPPORTED_ACTIVITY_TYPES.includes(activity.type)) return null;
   if (openActivityUrl) await updateAarpTab({ url: activity.url, active: true });
 
   return await queryAarpApi(
@@ -208,14 +184,15 @@ onUpdateAarpTabRequest(async (sendResponse, update) =>
 
 onGetUserRequest(async (sendResponse) => sendResponse(await getUser()));
 
-onActivitiesRequest(async (sendResponse, maxNActivities) =>
-  sendResponse(await getActivities(maxNActivities))
+onActivitiesRequest(async (sendResponse, { accessToken, maxNActivities }) =>
+  sendResponse(await getActivities(accessToken, maxNActivities))
 );
 
-onActivityStatusRequest(async (sendResponse, activityId) =>
-  sendResponse(await getActivityStatus(activityId))
+onActivityStatusRequest(async (sendResponse, { activityId, accessToken }) =>
+  sendResponse(await getActivityStatus(activityId, accessToken))
 );
 
-onEarnRewardsRequest(async (sendResponse, { activity, openActivityUrl }) =>
-  sendResponse(await earnActivityRewards(activity, openActivityUrl))
+onEarnRewardsRequest(
+  async (sendResponse, { activity, openActivityUrl, user }) =>
+    sendResponse(await earnActivityRewards(activity, openActivityUrl, user))
 );
