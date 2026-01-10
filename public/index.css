@@ -53,15 +53,6 @@ body {
   transition: background 0.3s;
 }
 
-.logo {
-  font-size: 1.5em;
-  font-weight: bold;
-}
-
-#dark-mode-toggle {
-  display: none;
-}
-
 .toggle {
   display: inline-block;
   width: 60px;
@@ -83,10 +74,6 @@ body {
   background: var(--toggle-circle);
   border-radius: 50%;
   transition: transform 0.3s;
-}
-
-#dark-mode-toggle:checked + .toggle::before {
-  transform: translateX(30px);
 }
 
 .hero {
