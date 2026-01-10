@@ -11,7 +11,11 @@ function Sidepanel() {
 
   return (
     <div>
-      <h1>Sidepanel</h1>
+      <div>
+        <h1>Sidepanel</h1>
+        <div onClick={() => chrome.runtime.openOptionsPage()}>Settings</div>
+      </div>
+
       <div id="platforms">
         {platforms.map((platform, idx) => (
           <div key={idx}>
