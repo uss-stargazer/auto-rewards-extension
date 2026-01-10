@@ -2,12 +2,15 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import AARP from "./AARP";
-import useTheme from "./hooks/useTheme";
+import useOptions from "./hooks/useOptions";
+import setTheme from "./modules/setTheme";
 
 const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
-  useTheme();
+  const { options } = useOptions();
+
+  setTheme(options.darkMode);
 
   return (
     <div>

@@ -1,5 +1,8 @@
 import * as z from "zod";
-import { createMessage, createTabMessage } from "../../modules/safeMessages";
+import {
+  createMessage,
+  createTabMessage,
+} from "../../modules/utils/safeMessages";
 
 export const SUPPORTED_ACTIVITY_TYPES = ["video"] as const;
 export type SupportedActivityType = (typeof SUPPORTED_ACTIVITY_TYPES)[number];

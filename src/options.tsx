@@ -1,14 +1,16 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import useTheme from "./hooks/useTheme";
-import { darkModeOption } from "./modules/options";
-
-const options = [darkModeOption];
+import useOptions from "./hooks/useOptions";
+import setTheme from "./modules/setTheme";
 
 function Options() {
-  useTheme();
+  const { options, setOption } = useOptions();
 
-  return <div></div>;
+  setTheme(options.darkMode);
+
+  return (
+    <div>{Object.entries(options).map(([optionName, value], idx) => {})}</div>
+  );
 }
 
 const root = createRoot(document.getElementById("root")!);

@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+// IMPORTANT: undefined is used for the default option, so please use null for option types instead
+
 let browserEnv: typeof chrome;
 if (typeof chrome !== "undefined") {
   browserEnv = chrome;
@@ -10,12 +12,11 @@ if (typeof chrome !== "undefined") {
 }
 
 type Callback<Value> = (newValue: Value) => void;
-type SetFunction<Value> = (newValue: Value | "default") => Promise<void>;
+type SetFunction<Value> = (newValue: Value | undefined) => Promise<void>;
 type GetFunction<Value> = () => Promise<Value>;
 type Subscriber<Value> = (callback: Callback<Value>) => () => void; // Returns function to remove subscriber
 
 export interface Option<Z extends z.ZodType> {
-  name: string;
   schema: Z;
   set: SetFunction<z.infer<Z>>;
   get: GetFunction<z.infer<Z>>;
@@ -38,16 +39,16 @@ const makeListener =
   };
 
 export const createOption = <Z extends z.ZodType>(
-  schema: Z,
   name: string,
+  schema: Z,
   defaultValue: z.infer<Z>
 ): Option<Z> => {
   type Data = z.infer<Z>;
   const defaultValueString = JSON.stringify(defaultValue);
 
-  const setOption = async (newValue: Data | "default"): Promise<void> => {
+  const setOption = async (newValue: Data | undefined): Promise<void> => {
     const valueString =
-      newValue === "default" ? defaultValueString : JSON.stringify(newValue);
+      newValue === undefined ? defaultValueString : JSON.stringify(newValue);
     return await browserEnv.storage.sync.set({ [name]: valueString });
   };
 
@@ -66,5 +67,5 @@ export const createOption = <Z extends z.ZodType>(
     return () => browserEnv.storage.sync.onChanged.removeListener(listener);
   };
 
-  return { name, schema, get: getOption, set: setOption, onUpdate: subscribe };
+  return { schema, get: getOption, set: setOption, onUpdate: subscribe };
 };
