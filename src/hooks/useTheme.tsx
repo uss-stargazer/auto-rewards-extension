@@ -1,16 +1,20 @@
-import { useEffect } from "react";
-import { getThemeOption, onThemeOption, Theme } from "../modules/options";
+import { useEffect, useState } from "react";
+import { darkModeOption } from "../modules/options";
 
-export default function useTheme() {
-  const root = document.documentElement;
+export default function useTheme(): "light" | "dark" {
+  const [darkMode, setDarkMode] = useState<boolean>(false);
 
-  const updateTheme = (theme: Theme) => {
-    if (theme === "dark") root.classList.add("dark-theme");
-    else root.classList.remove("dark-theme");
+  const body = document.body;
+  const updateTheme = (darkMode: boolean) => {
+    if (darkMode) body.classList.add("dark-theme");
+    else body.classList.remove("dark-theme");
+    setDarkMode(darkMode);
   };
 
   useEffect(() => {
-    getThemeOption().then(updateTheme); // Initial
-    return onThemeOption(updateTheme);
+    darkModeOption.get().then(updateTheme); // Initial
+    return darkModeOption.onUpdate(updateTheme);
   }, []);
+
+  return darkMode ? "dark" : "light";
 }

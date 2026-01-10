@@ -10,7 +10,17 @@ if (typeof chrome !== "undefined") {
 }
 
 type Callback<Value> = (newValue: Value) => void;
+type SetFunction<Value> = (newValue: Value | "default") => Promise<void>;
+type GetFunction<Value> = () => Promise<Value>;
 type Subscriber<Value> = (callback: Callback<Value>) => () => void; // Returns function to remove subscriber
+
+export interface Option<Z extends z.ZodType> {
+  name: string;
+  schema: Z;
+  set: SetFunction<z.infer<Z>>;
+  get: GetFunction<z.infer<Z>>;
+  onUpdate: Subscriber<z.infer<Z>>;
+}
 
 const makeListener =
   <Z extends z.ZodType>(
@@ -31,11 +41,7 @@ export const createOption = <Z extends z.ZodType>(
   schema: Z,
   name: string,
   defaultValue: z.infer<Z>
-): [
-  (newValue: z.infer<Z> | "default") => Promise<void>,
-  () => Promise<z.infer<Z>>,
-  Subscriber<z.infer<Z>>
-] => {
+): Option<Z> => {
   type Data = z.infer<Z>;
   const defaultValueString = JSON.stringify(defaultValue);
 
@@ -60,5 +66,5 @@ export const createOption = <Z extends z.ZodType>(
     return () => browserEnv.storage.sync.onChanged.removeListener(listener);
   };
 
-  return [setOption, getOption, subscribe];
+  return { name, schema, get: getOption, set: setOption, onUpdate: subscribe };
 };
