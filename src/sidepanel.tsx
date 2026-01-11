@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import AARP from "./AARP";
 import useOptions, { OptionsProvider } from "./hooks/useOptions";
 import setTheme from "./modules/setTheme";
+import { openExtensionOptions } from "./modules/definitions";
 
 const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
@@ -16,7 +17,7 @@ function Sidepanel() {
     <div>
       <div>
         <h1>Sidepanel</h1>
-        <div onClick={chrome.runtime.openOptionsPage}>Settings</div>
+        <div onClick={() => openExtensionOptions()}>Settings</div>
       </div>
 
       <div id="platforms">

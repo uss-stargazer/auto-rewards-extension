@@ -40,8 +40,8 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   const aarpTabs = tabs.filter((tab) => isAarpTab(tab.url));
   devLog("getAarpTab", "tabs:", tabs, "| aarp tabs:", aarpTabs);
   if (aarpTabs.length > 0) {
-    devLog("getAarpTab", "selected tab:", aarpTabs[0]);
-    return await waitForTab(aarpTabs[0].id!);
+    const loadedTab = aarpTabs.find((tab) => tab.status === "complete");
+    return loadedTab ?? (await waitForTab(aarpTabs[0].id!));
   }
   return new Promise((resolve) => {
     devLog(

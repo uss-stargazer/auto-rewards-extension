@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { devLog } from ".";
 
 // IMPORTANT: undefined is used for the default option, so please use null for option types instead
 
@@ -49,6 +50,7 @@ export const createOption = <Z extends z.ZodType>(
   const setOption = async (newValue: Data | undefined): Promise<void> => {
     const valueString =
       newValue === undefined ? defaultValueString : JSON.stringify(newValue);
+    devLog("setOption", name, "setting to", valueString);
     return await browserEnv.storage.sync.set({ [name]: valueString });
   };
 

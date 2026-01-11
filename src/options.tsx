@@ -1,4 +1,4 @@
-import React, { ReactElement } from "react";
+import React, { ReactElement, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import * as z from "zod";
 import useOptions, {
@@ -20,7 +20,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ErrorMessage } from "@hookform/error-message";
 import ReactSwitch from "react-switch";
-import { simpleDeepCompare } from "./modules/utils";
+import { devLog, simpleDeepCompare } from "./modules/utils";
 
 const optionDetails: {
   [K in OptionName]: {
@@ -64,6 +64,7 @@ function Input({
       <input
         type="text"
         {...register(optionName)}
+        ref={null}
         placeholder={details.placeholder}
         className={`form__input ${
           Object.prototype.hasOwnProperty.call(errors, optionName) &&
@@ -76,13 +77,12 @@ function Input({
       <Controller
         {...register(optionName)}
         control={control}
-        render={({ field }) => (
-          <ReactSwitch
-            onChange={field.onChange}
-            checked={field.value}
-            ref={field.ref}
-          />
-        )}
+        render={({ field }) => {
+          devLog("switchRender", optionName, "setting switch to", field.value);
+          return (
+            <ReactSwitch onChange={field.onChange} checked={field.value} />
+          );
+        }}
       />
     );
   } else {
@@ -106,34 +106,36 @@ function OptionsForm() {
   const { options, setOption } = useOptions();
 
   const methods = useForm<OptionData>({
-    mode: "onChange",
+    // mode: "onChange",
+    defaultValues: options,
     resolver: zodResolver(optionDataSchema),
   });
   const {
-    handleSubmit,
     formState: { errors },
+    watch,
   } = methods;
 
-  const onSubmit: SubmitHandler<OptionData> = (data) =>
-    Object.entries(data).forEach(([name, value]) => {
-      const optionName = name as keyof typeof data;
+  const watchedFormOptions = watch();
+
+  useEffect(() => {
+    Object.entries(watchedFormOptions).forEach(([name, value]) => {
+      const optionName = name as keyof typeof watchedFormOptions;
       if (!simpleDeepCompare(value, options[optionName]))
         setOption(optionName, value);
     });
+  }, [watchedFormOptions]);
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form>
         <div className="grid grid-cols-3 gap-4">
           {Object.keys(options).map((optionName) => (
             <Input
+              key={optionName}
               optionName={optionName as keyof typeof options}
               errors={errors}
             />
           ))}
-        </div>
-        <div>
-          <input type="submit" value="Save" />
         </div>
       </form>
     </FormProvider>
@@ -142,6 +144,7 @@ function OptionsForm() {
 
 function Options() {
   const { options, setOption } = useOptions();
+  devLog("Options", "options:", options);
 
   setTheme(options.darkMode);
 
