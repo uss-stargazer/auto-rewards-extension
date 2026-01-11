@@ -17,19 +17,16 @@ export function simpleDeepCompare(a: any, b: any): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export async function updateTabAndWaitForLoad(
-  tabId: number,
-  update: chrome.tabs.UpdateProperties
-): Promise<chrome.tabs.Tab | undefined> {
-  const updatedTab = await chrome.tabs.update(tabId, update);
-  if (!updatedTab) return undefined;
+export async function waitForTab(tabId: number): Promise<chrome.tabs.Tab> {
+  const targetTab = await chrome.tabs.get(tabId);
+  if (targetTab.status === "complete") return targetTab;
   return new Promise((resolve) => {
     const listener = (
       tabId: number,
       changeInfo: chrome.tabs.OnUpdatedInfo,
       tab: chrome.tabs.Tab
     ) => {
-      if (tabId === updatedTab.id && changeInfo.status === "complete") {
+      if (tabId === targetTab.id && changeInfo.status === "complete") {
         chrome.tabs.onUpdated.removeListener(listener);
         resolve(tab);
       }

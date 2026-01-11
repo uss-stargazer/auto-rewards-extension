@@ -1,4 +1,4 @@
-import { devLog, updateTabAndWaitForLoad } from "../modules/utils";
+import { devLog, waitForTab } from "../modules/utils";
 import {
   AarpActivity,
   AarpActivityStatuses,
@@ -41,7 +41,7 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
   devLog("getAarpTab", "tabs:", tabs, "| aarp tabs:", aarpTabs);
   if (aarpTabs.length > 0) {
     devLog("getAarpTab", "selected tab:", aarpTabs[0]);
-    return aarpTabs[0];
+    return await waitForTab(aarpTabs[0].id!);
   }
   return new Promise((resolve) => {
     devLog(
@@ -68,17 +68,14 @@ async function getAarpTab(): Promise<chrome.tabs.Tab> {
 
 async function updateAarpTab(
   update: chrome.tabs.UpdateProperties
-): Promise<number> {
-  devLog("update aarp tab:", update);
-  const aarpTab = await updateTabAndWaitForLoad(
-    (
-      await getAarpTab()
-    ).id!,
-    update
-  );
-  if (!aarpTab)
+): Promise<chrome.tabs.Tab> {
+  devLog("updateAarpTab", "updating:", update);
+  const updatedTab = await chrome.tabs.update((await getAarpTab()).id!, update);
+  if (!updatedTab)
     throw new Error("Error occurred updating AARP tab or tab was closed");
-  return aarpTab.id!;
+  const aarpTab = await waitForTab(updatedTab.id!);
+  devLog("updateAarpTab", "got updated:", aarpTab);
+  return aarpTab;
 }
 
 async function getUser(): Promise<{
@@ -142,9 +139,7 @@ async function getActivities(
 
   // Navigate to the rewards dashboard to make it look more normal instead of just
   // sending a bunch of API calls. Plus the tab was already created in getUser.
-  const aarpTab = await chrome.tabs.get(
-    await updateAarpTab({ url: REWARDS_URL })
-  );
+  const aarpTab = await updateAarpTab({ url: REWARDS_URL });
 
   const activitiesList = await queryAarpApi(
     ACTIVITY_LIST_API_URL,
@@ -275,9 +270,10 @@ async function earnActivityRewards(
 
 // Register functional message listeners ----------------------------------------------------------
 
-onUpdateAarpTabRequest(async (sendResponse, update) =>
-  sendResponse(await updateAarpTab(update))
-);
+onUpdateAarpTabRequest(async (sendResponse, update) => {
+  await updateAarpTab(update);
+  return sendResponse();
+});
 
 onGetUserRequest(async (sendResponse) => sendResponse(await getUser()));
 
