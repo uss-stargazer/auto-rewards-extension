@@ -6,6 +6,7 @@ import useOptions, {
   optionDataSchema,
   OptionName,
   optionSchemas,
+  OptionsProvider,
 } from "./hooks/useOptions";
 import setTheme from "./modules/setTheme";
 import {
@@ -173,6 +174,8 @@ const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <React.StrictMode>
-    <Options />
+    <OptionsProvider>
+      <Options />
+    </OptionsProvider>
   </React.StrictMode>
 );

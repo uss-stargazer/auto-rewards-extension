@@ -261,17 +261,24 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const fullyLoggedIn = !isLoading && user && !user.mustConfirmPassword;
 
   useEffect(() => {
+    console.log("[index.tsx] getting user");
     getUser()
       .then(({ user: newUser, balance: newBalance }) => {
+        console.log("[index.tsx] got user");
         setUser(newUser);
         setBalance(newBalance);
       })
       .finally(() => setIsLoading(false));
 
+    console.log("[index.tsx] connecting a sidepanel port");
     const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
+    console.log("[index.tsx] setting the sidepanel port");
     setPort(sidepanelPort);
 
-    return sidepanelPort.disconnect;
+    return () => {
+      console.log("[index.tsx] disconnecting the sidepanel port");
+      sidepanelPort.disconnect();
+    };
   }, []);
 
   // Update port message listener has seperate effect because it relies on user state

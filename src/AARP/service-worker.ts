@@ -284,16 +284,10 @@ const USER_UPDATE_BUFFER_MS = 1000;
 let sendUserUpdateTimeout: NodeJS.Timeout | null = null;
 
 function onPossibleUserChange() {
-  console.log("[background, userChangeAlert] got possible user change alert");
   if (sendUserUpdateTimeout) clearTimeout(sendUserUpdateTimeout);
   sendUserUpdateTimeout = setTimeout(async () => {
     if (sidepanelPort) {
       const { user, balance } = await getUser();
-      console.log(
-        "[background, userChangeAlert] got current user",
-        user,
-        "and sending update"
-      );
       sidepanelPort.postMessage({ user, balance });
     }
   }, USER_UPDATE_BUFFER_MS);
@@ -304,13 +298,7 @@ onPossibleUserChangeAlert(async (sendResponse) =>
 );
 
 chrome.cookies.onChanged.addListener((change) => {
-  console.log("[background, cookie listener] got cookie change", change);
   if (USER_COOKIES.includes(change.cookie.name)) {
-    console.log(
-      "[background, cookie listener] identified cookie change",
-      change.cookie.name,
-      "as possible user change and sent alert"
-    );
     onPossibleUserChange();
   }
 });

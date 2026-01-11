@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import AARP from "./AARP";
-import useOptions from "./hooks/useOptions";
+import useOptions, { OptionsProvider } from "./hooks/useOptions";
 import setTheme from "./modules/setTheme";
 
 const platforms: { name: string; element: React.ReactElement }[] = [AARP];
@@ -16,7 +16,7 @@ function Sidepanel() {
     <div>
       <div>
         <h1>Sidepanel</h1>
-        <div onClick={() => chrome.runtime.openOptionsPage()}>Settings</div>
+        <div onClick={chrome.runtime.openOptionsPage}>Settings</div>
       </div>
 
       <div id="platforms">
@@ -35,6 +35,8 @@ const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <React.StrictMode>
-    <Sidepanel />
+    <OptionsProvider>
+      <Sidepanel />
+    </OptionsProvider>
   </React.StrictMode>
 );
