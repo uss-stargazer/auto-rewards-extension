@@ -98,7 +98,7 @@ export const [setTabLocalStorage, onTabLocalStorageSetRequest] =
 
 export const [updateAarpTab, onUpdateAarpTabRequest] = createMessage<
   chrome.tabs.UpdateProperties,
-  number
+  void
 >("updateAarpTab");
 
 export const [getUser, onGetUserRequest] = createMessage<
