@@ -17,13 +17,13 @@ import {
 
 // IMPORTANT: undefined is used for the default option, so please use null for option types instead
 
-const optionSchemas = { darkMode: z.boolean() } as const;
-const optionObjSchema = z.object(optionSchemas);
+export const optionSchemas = { darkMode: z.boolean() } as const;
+export const optionDataSchema = z.object(optionSchemas);
 
-type OptionSchemas = typeof optionSchemas;
-type OptionName = keyof OptionSchemas;
-type OptionData = z.infer<typeof optionObjSchema>;
-type OptionsDefinitions = {
+export type OptionSchemas = typeof optionSchemas;
+export type OptionName = keyof OptionSchemas;
+export type OptionData = z.infer<typeof optionDataSchema>;
+export type OptionsDefinitions = {
   [K in OptionName]: Option<OptionSchemas[K]>;
 };
 
