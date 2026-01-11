@@ -1,4 +1,4 @@
-import React, { ReactElement, useEffect } from "react";
+import React, { ReactElement, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as z from "zod";
 import useOptions, {
@@ -9,148 +9,122 @@ import useOptions, {
   OptionsProvider,
 } from "./hooks/useOptions";
 import setTheme from "./modules/setTheme";
-import {
-  Controller,
-  FieldErrors,
-  FormProvider,
-  SubmitHandler,
-  useForm,
-  useFormContext,
-} from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ErrorMessage } from "@hookform/error-message";
 import ReactSwitch from "react-switch";
 import { devLog, simpleDeepCompare } from "./modules/utils";
 
-const optionDetails: {
-  [K in OptionName]: {
-    label: string;
-    placeholder?: string;
-    description: string;
+function FormInput<S extends z.ZodType>({
+  field,
+  schema,
+  value,
+  setValue,
+  setDefault,
+  info,
+}: {
+  field: string;
+  schema: S;
+  value: z.infer<S>;
+  setValue: (newValue: z.infer<S>) => void;
+  setDefault: () => void;
+  info: { label: string; placeholder?: string; description: string };
+}) {
+  const [error, setError] = useState<z.ZodError<z.infer<S>> | null>(null);
+  const [detailsIsOpen, setDetailsIsOpen] = useState<boolean>(false);
+
+  const onInput = (input: unknown) => {
+    const parsed = schema.safeParse(input);
+    if (parsed.success) {
+      setError(null);
+      setValue(parsed.data);
+    } else {
+      setError(parsed.error);
+    }
   };
-} = { darkMode: { label: "Dark Mode", description: "Use dark theme for UI" } };
 
-function InputErrorMessage({
-  errors,
-  name,
-}: {
-  name: OptionName;
-  errors: FieldErrors<OptionData>;
-}) {
-  return (
-    <ErrorMessage
-      errors={errors}
-      name={name}
-      render={({ message }) => <p className="form__error">{message}</p>}
-    />
-  );
-}
-
-function Input({
-  optionName,
-  errors,
-}: {
-  optionName: OptionName;
-  errors: FieldErrors<OptionData>;
-}) {
-  const { register, control } = useFormContext();
-
-  const schema = optionSchemas[optionName];
-  const details = optionDetails[optionName];
-
-  let primaryInput: ReactElement;
-  if (schema instanceof z.ZodString) {
-    primaryInput = (
+  const primaryInput: ReactElement =
+    schema instanceof z.ZodString ? (
       <input
         type="text"
-        {...register(optionName)}
-        ref={null}
-        placeholder={details.placeholder}
-        className={`form__input ${
-          Object.prototype.hasOwnProperty.call(errors, optionName) &&
-          "border-red-500"
-        } `}
+        value={value as z.infer<typeof schema>}
+        placeholder={info.placeholder}
+        className={`form__input ${error && "border-red-500"} `}
+        // HOwever inputs are gathered
       />
-    );
-  } else if (schema instanceof z.ZodBoolean) {
-    primaryInput = (
-      <Controller
-        {...register(optionName)}
-        control={control}
-        render={({ field }) => {
-          devLog("switchRender", optionName, "setting switch to", field.value);
-          return (
-            <ReactSwitch
-              onChange={(...stuff) => {
-                devLog("switchChange", stuff[0]);
-                field.onChange(...stuff);
-              }}
-              checked={field.value}
-            />
-          );
-        }}
+    ) : schema instanceof z.ZodBoolean ? (
+      <ReactSwitch
+        checked={value as z.infer<typeof schema>}
+        onChange={onInput}
       />
+    ) : (
+      (() => {
+        throw new Error(
+          `Input type for schema is not defined (schema: ${schema})`
+        );
+      })()
     );
-  } else {
-    throw new Error(`Input type for schema is not defined (schema: ${schema})`);
-  }
 
   return (
     <div>
-      <div>
-        <label htmlFor={optionName} className="form__label">
-          {details.label}
-        </label>
-        {primaryInput}
+      <div className="option-bar">
+        <div onClick={() => setDetailsIsOpen(!detailsIsOpen)}>
+          Dropdown icon
+        </div>
+        <div>
+          <label htmlFor={field} className="form__label">
+            {info.label}
+          </label>
+          {primaryInput}
+        </div>
+        {error && <p className="form__error">{error.message}</p>}
       </div>
-      <InputErrorMessage name={optionName} errors={errors} />
+      {detailsIsOpen && (
+        <div className="option-details" onClick={() => setDetailsIsOpen(false)}>
+          <p>{info.description}</p>
+          <a className="btn" onClick={setDefault}>
+            Reset to default
+          </a>
+        </div>
+      )}
     </div>
   );
 }
 
-function OptionsForm() {
-  const { options, setOption } = useOptions();
-
-  const methods = useForm<OptionData>({
-    // mode: "onChange",
-    defaultValues: options,
-    resolver: zodResolver(optionDataSchema),
-  });
-  const {
-    formState: { errors },
-    watch,
-  } = methods;
-
-  const watchedFormOptions = watch();
-
-  useEffect(() => {
-    Object.entries(watchedFormOptions).forEach(([name, value]) => {
-      const optionName = name as keyof typeof watchedFormOptions;
-      if (!simpleDeepCompare(value, options[optionName]))
-        setOption(optionName, value);
-    });
-  }, [watchedFormOptions]);
-
-  const resetOptions = () =>
-    Object.keys(options).forEach((name) =>
-      setOption(name as keyof typeof options, undefined)
-    );
-
+function Form<
+  D extends { [key: string]: any },
+  S extends { [K in keyof D]: z.ZodType<D[K]> }
+>({
+  data,
+  schemas,
+  setField,
+  resetField,
+}: {
+  data: D;
+  schemas: S;
+  setField: <F extends keyof D>(field: F, newValue: z.infer<S[F]>) => void;
+  resetField: <F extends keyof D>(field: F) => void;
+}) {
   return (
-    <FormProvider {...methods}>
-      <form>
-        <div className="grid grid-cols-3 gap-4">
-          {Object.keys(options).map((optionName) => (
-            <Input
-              key={optionName}
-              optionName={optionName as keyof typeof options}
-              errors={errors}
+    <form>
+      <div className="grid grid-cols-3 gap-4">
+        {Object.entries(data).map(([key, value]) => {
+          const field = key as keyof typeof data;
+          return (
+            <FormInput
+              key={key}
+              field={field.toString()}
+              schema={schemas[field]}
+              value={data[field]}
+              setValue={(newValue) => setField(field, newValue)}
+              setDefault={() => resetField(field)}
+              info={{
+                label: "Dark Mode",
+                description: "Use dark theme for UI",
+              }}
             />
-          ))}
-        </div>
-        <a onClick={resetOptions}>Reset to defaults</a>
-      </form>
-    </FormProvider>
+          );
+        })}
+      </div>
+      <a onClick={formProps.resetData}>Reset defaults</a>
+    </form>
   );
 }
 
@@ -164,7 +138,16 @@ function Options() {
     <div>
       <h1>Options</h1>
       <div>
-        <OptionsForm />
+        <Form
+          data={options}
+          schemas={optionSchemas}
+          setField={setOption}
+          resetData={() =>
+            Object.keys(options).forEach((option) => {
+              setOption(option as keyof typeof options, undefined);
+            })
+          }
+        />
       </div>
       <div>
         <p>
