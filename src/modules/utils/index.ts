@@ -8,23 +8,26 @@ export function simpleDeepCompare(a: any, b: any): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export async function updateTabAndWaitForLoad(
-  tabId: number,
-  update: chrome.tabs.UpdateProperties
-): Promise<chrome.tabs.Tab | undefined> {
-  const updatedTab = await chrome.tabs.update(tabId, update);
-  if (!updatedTab) return undefined;
+export async function waitForTab(
+  targetTabId: number
+): Promise<chrome.tabs.Tab> {
   return new Promise((resolve) => {
     const listener = (
       tabId: number,
       changeInfo: chrome.tabs.OnUpdatedInfo,
       tab: chrome.tabs.Tab
     ) => {
-      if (tabId === updatedTab.id && changeInfo.status === "complete") {
+      if (tabId === targetTabId && changeInfo.status === "complete") {
         chrome.tabs.onUpdated.removeListener(listener);
         resolve(tab);
       }
     };
+    chrome.tabs.get(targetTabId).then((tab) => {
+      if (tab.status === "complete") {
+        chrome.tabs.onUpdated.addListener(listener);
+        return tab;
+      }
+    });
     chrome.tabs.onUpdated.addListener(listener);
   });
 }

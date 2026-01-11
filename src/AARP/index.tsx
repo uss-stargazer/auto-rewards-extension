@@ -78,8 +78,7 @@ function Activity({
               activity: { ...activity, type: activity.activityType.identifier },
               user: { ...aarpData.user },
             }).then((rewardsResponse) => {
-              updateAarpTab({ url: activity.url });
-              onRewardsEarned();
+              updateAarpTab({ url: activity.url }).then(onRewardsEarned); // Wait for update to load before running onRewardsEarneds
             })
           }
         >
