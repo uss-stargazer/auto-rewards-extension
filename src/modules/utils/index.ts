@@ -1,4 +1,13 @@
 import { useState } from "react";
+import * as stackTraceParser from "stacktrace-parser";
+
+export function devLog(func: string, ...data: any[]) {
+  if (process.env.NODE_ENV === "development") {
+    const stack = stackTraceParser.parse(new Error().stack!);
+    const parent = stack[1];
+    console.log(`[${parent.file?.replace(/^.*[\\\/]/, "")}, ${func}]`, ...data);
+  }
+}
 
 /**
  * Converts both parameters to strings and compares those.

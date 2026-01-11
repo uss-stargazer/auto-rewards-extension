@@ -1,3 +1,4 @@
+import { devLog } from "../modules/utils";
 import {
   alertPossibleUserChange,
   USER_STORAGE_KEYS,
@@ -5,11 +6,14 @@ import {
   onTabLocalStorageSetRequest,
 } from "./modules/definitions";
 
-onTabLocalStorageGetRequest(async (sendResponse, key) =>
-  sendResponse(localStorage.getItem(key))
-);
+onTabLocalStorageGetRequest(async (sendResponse, key) => {
+  const value = localStorage.getItem(key);
+  devLog("onTabLocalStorageGetRequest", "getting", key, ":", value);
+  return sendResponse(value);
+});
 
 onTabLocalStorageSetRequest(async (sendResponse, { key, value }) => {
+  devLog("onTabLocalStorageSetRequest", "setting", key, ":", value);
   localStorage.setItem(key, value);
   return sendResponse();
 });
@@ -20,6 +24,8 @@ window.addEventListener("storage", (event) => {
   if (
     event.storageArea === localStorage &&
     USER_STORAGE_KEYS.includes(event.key!)
-  )
+  ) {
+    devLog("aarpStorageListener", "recieved possible change storage:", event);
     alertPossibleUserChange();
+  }
 });

@@ -17,7 +17,7 @@ import {
 } from "./modules/definitions";
 import LoadingAnimation from "../components/LoadingAnimation";
 import { LOGIN_URL } from "./modules/tools";
-import { simpleDeepCompare } from "../modules/utils";
+import { devLog, simpleDeepCompare } from "../modules/utils";
 import {
   ActivitiesFilter,
   applyActivitiesFilter,
@@ -93,22 +93,8 @@ function Activity({
 function AARP() {
   const aarpData = useContext(AARPDataContext);
 
-  // Handle edge cases (loading or not logged in) -------------------------------------------------
-
-  if (aarpData === "loading") return <LoadingAnimation />;
-  if (aarpData.status !== "loggedIn")
-    return (
-      <div>
-        <h2>
-          {aarpData.status === "mustConfirmPassword"
-            ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
-            : "You are not logged into AARP."}
-        </h2>
-        <a onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}>
-          Log in
-        </a>
-      </div>
-    );
+  if (aarpData === "loading" || aarpData.status !== "loggedIn")
+    throw new Error("AARP can be rendered when user is not logged in");
 
   // Filtering, displaying, and fetching statuses of activities -----------------------------------
 
@@ -249,6 +235,29 @@ function AARP() {
   );
 }
 
+function AARPUserCheck({ children }: PropsWithChildren) {
+  const aarpData = useContext(AARPDataContext);
+
+  // Handle edge cases (loading or not logged in) -------------------------------------------------
+
+  if (aarpData === "loading") return <LoadingAnimation />;
+  if (aarpData.status !== "loggedIn")
+    return (
+      <div>
+        <h2>
+          {aarpData.status === "mustConfirmPassword"
+            ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
+            : "You are not logged into AARP."}
+        </h2>
+        <a onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}>
+          Log in
+        </a>
+      </div>
+    );
+
+  return children;
+}
+
 function AARPDataProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [user, setUser] = useState<AarpUser | null>(null);
@@ -261,22 +270,22 @@ function AARPDataProvider({ children }: PropsWithChildren) {
   const fullyLoggedIn = !isLoading && user && !user.mustConfirmPassword;
 
   useEffect(() => {
-    console.log("[index.tsx] getting user");
+    devLog("user/port effect", "getting user");
     getUser()
       .then(({ user: newUser, balance: newBalance }) => {
-        console.log("[index.tsx] got user");
+        devLog("user/port effect", "got user");
         setUser(newUser);
         setBalance(newBalance);
       })
       .finally(() => setIsLoading(false));
 
-    console.log("[index.tsx] connecting a sidepanel port");
+    devLog("user/port effect", "connecting a sidepanel port");
     const sidepanelPort = chrome.runtime.connect({ name: "sidepanel-port" });
-    console.log("[index.tsx] setting the sidepanel port");
+    devLog("user/port effect", "setting the sidepanel port");
     setPort(sidepanelPort);
 
     return () => {
-      console.log("[index.tsx] disconnecting the sidepanel port");
+      devLog("user/port effect", "disconnecting the sidepanel port");
       sidepanelPort.disconnect();
     };
   }, []);
@@ -294,8 +303,12 @@ function AARPDataProvider({ children }: PropsWithChildren) {
         if (!simpleDeepCompare(user, newUser)) setUser(newUser);
         if (!simpleDeepCompare(balance, newBalance)) setBalance(newBalance);
       };
+      devLog("user listener effect", "adding listener");
       port.onMessage.addListener(userUpdateListener);
-      return () => port.onMessage.removeListener(userUpdateListener);
+      return () => {
+        devLog("user listener effect", "removing listener");
+        port.onMessage.removeListener(userUpdateListener);
+      };
     }
   }, [port, user]);
 
@@ -336,7 +349,9 @@ export default {
   name: "AARP",
   element: (
     <AARPDataProvider>
-      <AARP />
+      <AARPUserCheck>
+        <AARP />
+      </AARPUserCheck>
     </AARPDataProvider>
   ),
 };
