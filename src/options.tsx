@@ -80,7 +80,13 @@ function Input({
         render={({ field }) => {
           devLog("switchRender", optionName, "setting switch to", field.value);
           return (
-            <ReactSwitch onChange={field.onChange} checked={field.value} />
+            <ReactSwitch
+              onChange={(...stuff) => {
+                devLog("switchChange", stuff[0]);
+                field.onChange(...stuff);
+              }}
+              checked={field.value}
+            />
           );
         }}
       />
@@ -125,6 +131,11 @@ function OptionsForm() {
     });
   }, [watchedFormOptions]);
 
+  const resetOptions = () =>
+    Object.keys(options).forEach((name) =>
+      setOption(name as keyof typeof options, undefined)
+    );
+
   return (
     <FormProvider {...methods}>
       <form>
@@ -137,6 +148,7 @@ function OptionsForm() {
             />
           ))}
         </div>
+        <a onClick={resetOptions}>Reset to defaults</a>
       </form>
     </FormProvider>
   );
@@ -148,18 +160,12 @@ function Options() {
 
   setTheme(options.darkMode);
 
-  const resetOptions = () =>
-    Object.keys(options).forEach((name) =>
-      setOption(name as keyof typeof options, undefined)
-    );
-
   return (
     <div>
       <h1>Options</h1>
       <div>
         <OptionsForm />
       </div>
-      <a onClick={resetOptions}>Reset to defaults</a>
       <div>
         <p>
           AutoRewards is an extension to automate gathering rewards for a
