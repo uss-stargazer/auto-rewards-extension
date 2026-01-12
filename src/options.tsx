@@ -12,6 +12,12 @@ import setTheme from "./modules/setTheme";
 import ReactSwitch from "react-switch";
 import { devLog, simpleDeepCompare } from "./modules/utils";
 
+type InputInfo = {
+  label: string;
+  placeholder?: string;
+  description: string;
+};
+
 function FormInput<S extends z.ZodType>({
   field,
   schema,
@@ -25,7 +31,7 @@ function FormInput<S extends z.ZodType>({
   value: z.infer<S>;
   setValue: (newValue: z.infer<S>) => void;
   setDefault: () => void;
-  info: { label: string; placeholder?: string; description: string };
+  info: InputInfo;
 }) {
   const [error, setError] = useState<z.ZodError<z.infer<S>> | null>(null);
   const [detailsIsOpen, setDetailsIsOpen] = useState<boolean>(false);
@@ -47,7 +53,7 @@ function FormInput<S extends z.ZodType>({
         value={value as z.infer<typeof schema>}
         placeholder={info.placeholder}
         className={`form__input ${error && "border-red-500"} `}
-        // HOwever inputs are gathered
+        onChange={(event) => onInput(event.target.value)}
       />
     ) : schema instanceof z.ZodBoolean ? (
       <ReactSwitch
@@ -88,19 +94,21 @@ function FormInput<S extends z.ZodType>({
   );
 }
 
-function Form<
-  D extends { [key: string]: any },
-  S extends { [K in keyof D]: z.ZodType<D[K]> }
->({
+function Form<D extends { [key: string]: any }>({
   data,
   schemas,
   setField,
   resetField,
+  fieldInfos,
 }: {
   data: D;
-  schemas: S;
-  setField: <F extends keyof D>(field: F, newValue: z.infer<S[F]>) => void;
+  schemas: { [K in keyof D]: z.ZodType<D[K]> };
+  setField: <F extends keyof D>(
+    field: F,
+    newValue: z.infer<(typeof schemas)[F]>
+  ) => void;
   resetField: <F extends keyof D>(field: F) => void;
+  fieldInfos: { [K in keyof D]: InputInfo };
 }) {
   return (
     <form>
@@ -115,15 +123,20 @@ function Form<
               value={data[field]}
               setValue={(newValue) => setField(field, newValue)}
               setDefault={() => resetField(field)}
-              info={{
-                label: "Dark Mode",
-                description: "Use dark theme for UI",
-              }}
+              info={fieldInfos[field]}
             />
           );
         })}
       </div>
-      <a onClick={formProps.resetData}>Reset defaults</a>
+      <a
+        onClick={() =>
+          Object.keys(data).forEach((field) =>
+            resetField(field as keyof typeof data)
+          )
+        }
+      >
+        Reset defaults
+      </a>
     </form>
   );
 }
@@ -134,6 +147,13 @@ function Options() {
 
   setTheme(options.darkMode);
 
+  const optionInfos = {
+    darkMode: {
+      label: "Dark Mode",
+      description: "Use dark theme for UI",
+    },
+  };
+
   return (
     <div>
       <h1>Options</h1>
@@ -142,11 +162,8 @@ function Options() {
           data={options}
           schemas={optionSchemas}
           setField={setOption}
-          resetData={() =>
-            Object.keys(options).forEach((option) => {
-              setOption(option as keyof typeof options, undefined);
-            })
-          }
+          resetField={(field) => setOption(field, undefined)}
+          fieldInfos={optionInfos}
         />
       </div>
       <div>
