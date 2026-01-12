@@ -9,6 +9,7 @@ import { createOption, Option } from "../modules/utils/safeOptions";
 import { getDarkModePreference } from "../modules/definitions";
 import {
   createStatesObject,
+  devLog,
   parseStatesObject,
   UseStateReturn,
 } from "../modules/utils";
@@ -18,7 +19,9 @@ import {
 // IMPORTANT: undefined is used for the default option, so please use null for option types instead
 
 export const optionSchemas = { darkMode: z.boolean() } as const;
+devLog("Options DEFS", "optionSchemas:", optionSchemas);
 export const optionDataSchema = z.object(optionSchemas);
+devLog("Options DEFS", "optionDataSchema:", optionDataSchema);
 
 export type OptionSchemas = typeof optionSchemas;
 export type OptionName = keyof OptionSchemas;
@@ -38,6 +41,7 @@ const DEFAULT_OPTION_VALUES: OptionData = {
           )[0].id!
         ))(),
 };
+devLog("Options DEFS", "DEFAULT_OPTION_VALUES:", DEFAULT_OPTION_VALUES);
 
 // This function is kinda a mess for type safety but it returns an
 // object of `Option` types (from safeOptions util)
@@ -60,6 +64,8 @@ const populateOptionDefinitions = <T extends { [key: string]: z.ZodType }>(
 const optionDefinitions: OptionsDefinitions =
   populateOptionDefinitions(optionSchemas);
 
+devLog("Options DEFS", "optionDefinitions:", optionDefinitions);
+
 // Context and hook -------------------------------------------------------------------------------
 
 type SetOptionFunction = <K extends OptionName>(
@@ -77,14 +83,26 @@ export function OptionsProvider({ children }: PropsWithChildren) {
 
     const addOptionListeners = <
       D extends { [key: string]: Option<any> },
-      S extends { [key: string]: UseStateReturn<any> }
+      S extends { [K in keyof D]: UseStateReturn<any> }
     >(
       optionDefinitions: D,
       optionStates: S
     ) => {
       for (const optionName in optionDefinitions) {
         const removeListener = optionDefinitions[optionName].onUpdate(
-          (newValue) => optionStates[optionName][1](newValue)
+          (newValue) => {
+            console.log(
+              "OptionsProvider optionListener",
+              "got newValue:",
+              newValue
+            );
+            optionStates[optionName][1](newValue);
+          }
+        );
+        devLog(
+          "OptionsProvider",
+          "registering option listener for",
+          optionName
         );
         removeListenerFunctions.push(removeListener);
       }
@@ -92,11 +110,28 @@ export function OptionsProvider({ children }: PropsWithChildren) {
 
     addOptionListeners(optionDefinitions, optionStates);
 
-    return () => removeListenerFunctions.forEach((f) => f());
+    // Set initial values for state
+    Object.entries(optionStates).forEach(([option, [, setOption]]) => {
+      const optionName = option as keyof typeof optionStates;
+      optionDefinitions[optionName]
+        .get()
+        .then((initialValue) => setOption(initialValue));
+    });
+
+    return () => {
+      devLog(
+        "OptionsProvider",
+        "removing all option listeners:",
+        removeListenerFunctions
+      );
+      removeListenerFunctions.forEach((f) => f());
+    };
   }, []);
 
-  const setOption: SetOptionFunction = (option, newValue) =>
-    optionDefinitions[option].set(newValue);
+  const setOption: SetOptionFunction = (option, newValue) => {
+    devLog("OptionsProvider setOptions", "called:", { option, newValue });
+    return optionDefinitions[option].set(newValue);
+  };
 
   return (
     <OptionsDataContext.Provider

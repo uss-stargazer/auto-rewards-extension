@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import AARP from "./AARP";
@@ -10,6 +10,7 @@ const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
   const { options } = useOptions();
+  const [activePlatformIdx, setActivePlatformIdx] = useState<number>(-1);
 
   setTheme(options.darkMode);
 
@@ -22,9 +23,16 @@ function Sidepanel() {
 
       <div id="platforms">
         {platforms.map((platform, idx) => (
-          <div key={idx}>
-            <p>{platform.name}</p>
-            <div>{platform.element}</div>
+          <div key={platform.name}>
+            <div
+              onClick={() => {
+                if (activePlatformIdx === idx) setActivePlatformIdx(-1);
+                else setActivePlatformIdx(idx);
+              }}
+            >
+              <p>{platform.name}</p>
+            </div>
+            {idx === activePlatformIdx && <div>{platform.element}</div>}
           </div>
         ))}
       </div>

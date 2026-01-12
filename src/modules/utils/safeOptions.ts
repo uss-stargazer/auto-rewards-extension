@@ -32,10 +32,25 @@ const makeListener =
     defaultValueString: string
   ): ((changes: { [key: string]: chrome.storage.StorageChange }) => void) =>
   (changes) => {
+    console.log(
+      "safeOptionListener",
+      name,
+      "listener got a rando change:",
+      changes
+    );
     const change = changes[name];
     if (change !== undefined) {
       const valueString = (change.newValue ?? defaultValueString) as string;
-      callback(schema.parse(JSON.parse(valueString)));
+      const parsed = schema.parse(JSON.parse(valueString));
+      console.log(
+        "safeOptionListener",
+        name,
+        "listener identified change:",
+        change,
+        "| then i parsed it into:",
+        parsed
+      );
+      callback(parsed);
     }
   };
 

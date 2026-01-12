@@ -37,7 +37,9 @@ function FormInput<S extends z.ZodType>({
   const [detailsIsOpen, setDetailsIsOpen] = useState<boolean>(false);
 
   const onInput = (input: unknown) => {
+    devLog("FormInput", "onInput cb got input:", input);
     const parsed = schema.safeParse(input);
+    devLog("FormInput", "onInput cb parsed input:", parsed);
     if (parsed.success) {
       setError(null);
       setValue(parsed.data);
@@ -110,6 +112,8 @@ function Form<D extends { [key: string]: any }>({
   resetField: <F extends keyof D>(field: F) => void;
   fieldInfos: { [K in keyof D]: InputInfo };
 }) {
+  devLog("Form", "form reloaded with data:", data);
+
   return (
     <form>
       <div className="grid grid-cols-3 gap-4">
@@ -143,7 +147,7 @@ function Form<D extends { [key: string]: any }>({
 
 function Options() {
   const { options, setOption } = useOptions();
-  devLog("Options", "options:", options);
+  devLog("Options", "root options:", options);
 
   setTheme(options.darkMode);
 
