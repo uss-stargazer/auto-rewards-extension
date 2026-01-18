@@ -22,6 +22,8 @@ import {
   ActivitiesFilter,
   applyActivitiesFilter,
 } from "./modules/activitiesFilter";
+import { MdCheckCircle, MdRefresh } from "react-icons/md";
+import { FaCircleMinus, FaCirclePlus } from "react-icons/fa6";
 
 type AARPData =
   | {
@@ -59,31 +61,47 @@ function Activity({
   if (!activity) throw RangeError("<Activity/> activityIdx out of bounds");
 
   return (
-    <div>
-      <div>
-        <h4>{activity.name}</h4>
+    <div className="block list">
+      <div className="bar">
+        <h4
+          className="clickable"
+          onClick={() => updateAarpTab({ active: true, url: activity.url })}
+        >
+          {activity.name}
+        </h4>
         {status === "complete" ? (
-          <p>Completed</p>
-        ) : status === "incomplete" ? (
-          <p>{activity.activityType.basePointValue}</p>
+          <MdCheckCircle className="large-icon primary-color" />
         ) : (
-          <p>Status unknown</p>
+          <h4 className="primary-color one-line">
+            {status === "incomplete"
+              ? activity.activityType.basePointValue
+              : "Status unknown"}
+          </h4>
         )}
       </div>
+
       <p>{activity.description}</p>
+
       {status === "incomplete" && (
-        <a
-          onClick={() =>
-            earnActivityRewards({
-              activity: { ...activity, type: activity.activityType.identifier },
-              user: { ...aarpData.user },
-            }).then((rewardsResponse) => {
-              updateAarpTab({ url: activity.url }).then(onRewardsEarned); // Wait for update to load before running onRewardsEarneds
-            })
-          }
-        >
-          Get rewards
-        </a>
+        <div className="bar">
+          <div />
+          <a
+            className="btn one-line"
+            onClick={() =>
+              earnActivityRewards({
+                activity: {
+                  ...activity,
+                  type: activity.activityType.identifier,
+                },
+                user: { ...aarpData.user },
+              }).then((rewardsResponse) => {
+                updateAarpTab({ url: activity.url }).then(onRewardsEarned); // Wait for update to load before running onRewardsEarneds
+              })
+            }
+          >
+            Earn rewards
+          </a>
+        </div>
       )}
     </div>
   );
@@ -179,58 +197,75 @@ function AARP() {
   // The UI and stuff -----------------------------------------------------------------------------
 
   return (
-    <div>
+    <>
       <div>
-        <h2>Hello {aarpData.user.username}!</h2>
-        <h3>Rewards balance: {aarpData.balance.rewardsBalance ?? "unknown"}</h3>
-        <h3>
-          Daily points left: {aarpData.balance.dailyPointsLeft ?? "unknown"}
-        </h3>
+        <h2>
+          Hi <span className="primary-color">{aarpData.user.username}</span>
+        </h2>
+        <div className="bar">
+          <h4>Rewards balance:</h4>
+          <h3 className="primary-color">
+            {aarpData.balance.rewardsBalance ?? "unknown"}
+          </h3>
+        </div>
+        <div className="bar">
+          <h4>Available today:</h4>
+          <h3 className="primary-color">
+            {aarpData.balance.dailyPointsLeft ?? "unknown"}
+          </h3>
+        </div>
       </div>
-      <div>
-        {activitiesAreLoading ? (
-          <LoadingAnimation />
-        ) : aarpData.activities.length > 0 ? (
-          <>
-            <a onClick={updateActivityStatuses}>Refresh</a>
-            <div>
-              {nActivitiesShown > 0 ? (
-                filteredActivities
-                  .slice(0, nActivitiesShown)
-                  .map((activityIdx) => (
-                    <Activity
-                      key={activityIdx}
-                      activityIdx={activityIdx}
-                      status={activityStatuses[activityIdx] ?? "unknown"}
-                      onRewardsEarned={updateActivityStatuses}
-                    />
-                  ))
-              ) : (
-                <p>Showing 0 activities</p>
-              )}
-            </div>
-            <div>
-              <button
-                onClick={() =>
-                  setNActivitiesShown(nActivitiesShown - ACTIVITIES_CHUNK_SIZE)
-                }
-              >
-                Show less
-              </button>
-              <button
-                onClick={() =>
-                  setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
-                }
-              >
-                Show more
-              </button>
-            </div>
-          </>
-        ) : (
-          <p>No activities found.</p>
-        )}
-      </div>
-    </div>
+
+      <hr />
+
+      {activitiesAreLoading ? (
+        <LoadingAnimation />
+      ) : aarpData.activities.length > 0 ? (
+        <div className="list medium-gap">
+          <div className="center-items">
+            <a className="button-icon" onClick={updateActivityStatuses}>
+              <MdRefresh className="medium-icon" />
+            </a>
+          </div>
+          <div className="list">
+            {nActivitiesShown > 0 ? (
+              filteredActivities
+                .slice(0, nActivitiesShown)
+                .map((activityIdx) => (
+                  <Activity
+                    key={activityIdx}
+                    activityIdx={activityIdx}
+                    status={activityStatuses[activityIdx] ?? "unknown"}
+                    onRewardsEarned={updateActivityStatuses}
+                  />
+                ))
+            ) : (
+              <p>Showing 0 activities</p>
+            )}
+          </div>
+          <div className="center-items">
+            <a
+              className="button-icon"
+              onClick={() =>
+                setNActivitiesShown(nActivitiesShown - ACTIVITIES_CHUNK_SIZE)
+              }
+            >
+              <FaCircleMinus className="medium-icon" />
+            </a>
+            <a
+              className="button-icon"
+              onClick={() =>
+                setNActivitiesShown(nActivitiesShown + ACTIVITIES_CHUNK_SIZE)
+              }
+            >
+              <FaCirclePlus className="medium-icon" />
+            </a>
+          </div>
+        </div>
+      ) : (
+        <p>No activities found.</p>
+      )}
+    </>
   );
 }
 
@@ -242,16 +277,27 @@ function AARPUserCheck({ children }: PropsWithChildren) {
   if (aarpData === "loading") return <LoadingAnimation />;
   if (aarpData.status !== "loggedIn")
     return (
-      <div>
-        <h2>
-          {aarpData.status === "mustConfirmPassword"
-            ? `You are logged in as ${aarpData.user.username}, but you need to confirm your password.`
-            : "You are not logged into AARP."}
-        </h2>
-        <a onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}>
-          Log in
-        </a>
-      </div>
+      <>
+        <div className="bar">
+          <h3>
+            {aarpData.status === "mustConfirmPassword" ? (
+              <>
+                You are logged in as
+                <span className="primary-color"> {aarpData.user.username}</span>
+                , but you need to confirm your password.
+              </>
+            ) : (
+              "You are not logged into AARP."
+            )}
+          </h3>
+          <a
+            className="btn one-line"
+            onClick={() => updateAarpTab({ url: LOGIN_URL, active: true })}
+          >
+            Log in
+          </a>
+        </div>
+      </>
     );
 
   return children;
