@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
+import useOptions, { OptionsProvider } from "./hooks/useOptions";
+import setTheme from "./modules/setTheme";
 import { openExtensionOptions } from "./modules/definitions";
 import { MdKeyboardArrowDown, MdOutlineSettings } from "react-icons/md";
 
@@ -8,7 +10,10 @@ import AARP from "./AARP";
 const platforms: { name: string; element: React.ReactElement }[] = [AARP];
 
 function Sidepanel() {
+  const { options } = useOptions();
   const [activePlatformIdx, setActivePlatformIdx] = useState<number>(-1);
+
+  setTheme(options.darkMode);
 
   return (
     <>
@@ -52,6 +57,8 @@ const root = createRoot(document.getElementById("root")!);
 
 root.render(
   <React.StrictMode>
-    <Sidepanel />
+    <OptionsProvider>
+      <Sidepanel />
+    </OptionsProvider>
   </React.StrictMode>
 );
