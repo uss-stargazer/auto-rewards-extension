@@ -30,3 +30,10 @@ Next, both Google Chrome and Microsoft Edge support Chrome extensions, so for ei
       - video
   - Useful UI for filtering activities if you still want to complete them for enjoyment
     (but now you don't have to worry about getting rewards!)
+
+## TODO
+
+- mobile accessiblility
+- get all button
+- more activity types
+- filtering
